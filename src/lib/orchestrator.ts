@@ -393,7 +393,15 @@ ${this.task!.description}
 
 Please provide your complete implementation plan with all code changes.`;
 
-    const response = await this.callClaude(systemPrompt, userMessage);
+    const response = await this.callClaude(systemPrompt, userMessage, undefined, "claude");
+
+    // Commit the proposal to the Claude branch
+    await this.github!.createOrUpdateFile({
+      branch: this.state.claudeBranch,
+      path: `docs/vibeflow/proposals/claude-${this.taskId}.md`,
+      message: `feat(claude): implementation proposal for ${this.task!.title}`,
+      content: response,
+    }).catch((e) => console.warn("[Claude Commit Warning]", e));
 
     // Log the implementation to debate log
     await this.logDebate(
@@ -464,8 +472,17 @@ Please provide your complete implementation plan with all code changes. Remember
     const response = await this.callClaude(
       systemPrompt,
       userMessage,
-      "ANTIGRAVITY"
+      "ANTIGRAVITY",
+      "antigravity"
     );
+
+    // Commit the proposal to the Antigravity branch
+    await this.github!.createOrUpdateFile({
+      branch: this.state.antigravityBranch,
+      path: `docs/vibeflow/proposals/antigravity-${this.taskId}.md`,
+      message: `feat(antigravity): implementation proposal for ${this.task!.title}`,
+      content: response,
+    }).catch((e) => console.warn("[Antigravity Commit Warning]", e));
 
     // Log the implementation to debate log
     await this.logDebate(
@@ -725,7 +742,15 @@ ${debateTranscript}
 
 Please produce the final synthesized implementation plan. For each file, specify the complete content or changes needed.`;
 
-    const synthesisSummary = await this.callClaude(systemPrompt, userMessage);
+    const synthesisSummary = await this.callClaude(systemPrompt, userMessage, undefined, "synthesis");
+
+    // Commit the synthesized code to the synthesis branch so GitHub PR has changes
+    await this.github!.createOrUpdateFile({
+      branch: this.state.synthesisBranch,
+      path: `docs/vibeflow/synthesis/${this.taskId}.md`,
+      message: `feat(synthesis): cross-pollinated synthesis for ${this.task!.title}`,
+      content: synthesisSummary,
+    }).catch((e) => console.warn("[Synthesis Commit Warning]", e));
 
     // Log the synthesis decision
     await this.logDebate(

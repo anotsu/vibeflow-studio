@@ -555,6 +555,49 @@ export class GitHubService {
       );
     }
   }
+
+  /**
+   * Create or update a file on a branch.
+   */
+  async createOrUpdateFile(params: {
+    path: string;
+    content: string;
+    message: string;
+    branch: string;
+  }): Promise<{ sha: string }> {
+    try {
+      let existingSha: string | undefined;
+      try {
+        const { data } = await this.octokit.rest.repos.getContent({
+          owner: this.owner,
+          repo: this.repo,
+          path: params.path,
+          ref: params.branch,
+        });
+        if (!Array.isArray(data) && "sha" in data) {
+          existingSha = data.sha;
+        }
+      } catch {
+        // File does not exist yet
+      }
+
+      const { data } = await this.octokit.rest.repos.createOrUpdateFileContents({
+        owner: this.owner,
+        repo: this.repo,
+        path: params.path,
+        message: params.message,
+        content: Buffer.from(params.content).toString("base64"),
+        branch: params.branch,
+        sha: existingSha,
+      });
+
+      return { sha: data.commit.sha ?? "" };
+    } catch (error) {
+      throw new Error(
+        `GitHubService.createOrUpdateFile failed for ${params.path} on ${params.branch}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 }
 
 /**
