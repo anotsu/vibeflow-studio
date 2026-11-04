@@ -1,0 +1,323 @@
+// ============================================================
+// VibeFlow Studio — Prisma Schema
+// PostgreSQL + Full data model for VibeCoding platform
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────
+
+enum ProjectMode {
+  ASSISTED
+  AUTO
+}
+
+enum MilestonePhase {
+  ARCHITECTURE
+  MVP
+  UI_UX
+  INTEGRATIONS
+  DEPLOYMENT
+  MAINTENANCE
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum ToolboxCategory {
+  FRAMEWORK
+  DATABASE
+  AUTH
+  PAYMENT
+  UI_KIT
+  API
+  MONITORING
+  CI_CD
+  HOSTING
+  TESTING
+  SECURITY
+  OTHER
+}
+
+enum ToolboxStatus {
+  ACQUIRED
+  MISSING
+  IN_PROGRESS
+}
+
+enum TaskStatus {
+  BACKLOG
+  CLAUDE_IN_PROGRESS
+  ANTIGRAVITY_IN_PROGRESS
+  IN_DEBATE
+  SYNTHESIS
+  TESTING
+  COMPLETED
+  FAILED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TaskOrigin {
+  USER
+  AI_GENERATED
+  AUTO_OPTIMIZATION
+}
+
+enum AgentSpeaker {
+  CLAUDE
+  ANTIGRAVITY
+  SYSTEM
+  USER
+}
+
+enum DeploymentStatus {
+  QUEUED
+  BUILDING
+  RUNNING
+  STOPPED
+  FAILED
+  CANCELLED
+}
+
+enum DeploymentEnvironment {
+  PRODUCTION
+  PREVIEW
+  STAGING
+}
+
+// ─── Models ──────────────────────────────────────────────────
+
+model Project {
+  id               String       @id @default(cuid())
+  name             String
+  slug             String       @unique
+  vibeDescription  String       @db.Text
+  githubRepo       String       // format: "owner/repo"
+  githubDefaultBranch String    @default("main")
+  coolifyAppUuid   String?
+  coolifyServerUrl String?
+  mode             ProjectMode  @default(ASSISTED)
+
+  // Encrypted API keys specific to this project
+  anthropicApiKey  String?      @db.Text  // encrypted
+  coolifyApiToken  String?      @db.Text  // encrypted
+  githubToken      String?      @db.Text  // encrypted
+
+  // Relationships
+  milestones       Milestone[]
+  toolboxItems     ToolboxItem[]
+  tasks            Task[]
+  deployments      Deployment[]
+  chatMessages     ChatMessage[]
+  
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([slug])
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String          @db.Text
+  phase       MilestonePhase
+  order       Int
+  status      MilestoneStatus @default(PENDING)
+  progress    Float           @default(0) // 0.0 - 1.0
+
+  githubIssueNumber Int?
+  
+  tasks       Task[]
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([projectId, order])
+  @@index([projectId, status])
+}
+
+model ToolboxItem {
+  id          String           @id @default(cuid())
+  projectId   String
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?          @db.Text
+  category    ToolboxCategory
+  status      ToolboxStatus    @default(MISSING)
+  version     String?
+  
+  // JSON config for install commands, env vars needed, etc.
+  configJson  Json?
+  
+  // Reference to a reusable snippet/template
+  snippetCode String?          @db.Text
+  sourceFile  String?          // file path where detected (e.g., package.json)
+
+  detectedAt  DateTime?
+  installedAt DateTime?
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([projectId, status])
+  @@index([projectId, category])
+}
+
+model Task {
+  id                  String       @id @default(cuid())
+  projectId           String
+  project             Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId         String?
+  milestone           Milestone?   @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  
+  title               String
+  description         String       @db.Text
+  status              TaskStatus   @default(BACKLOG)
+  priority            TaskPriority @default(MEDIUM)
+  origin              TaskOrigin   @default(USER)
+  
+  // Git branch tracking
+  claudeBranch        String?      // e.g., "agent/claude-cuid123"
+  antigravityBranch   String?      // e.g., "agent/antigravity-cuid123"
+  synthesisBranch     String?      // e.g., "synthesis/cuid123"
+  
+  // GitHub PR references
+  claudePrNumber      Int?
+  antigravityPrNumber Int?
+  synthesisPrNumber   Int?
+  
+  // Agent outputs
+  claudeImplementation    String?  @db.Text  // summary of Claude's approach
+  antigravityImplementation String? @db.Text // summary of Antigravity's approach
+  synthesisDecision       String?  @db.Text  // final merged decision rationale
+
+  // Metadata
+  estimatedMinutes   Int?
+  actualMinutes      Int?
+  
+  // Relationships
+  debateLogs         AgentDebateLog[]
+  
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([projectId, status])
+  @@index([projectId, priority])
+  @@index([milestoneId])
+}
+
+model AgentDebateLog {
+  id           String       @id @default(cuid())
+  taskId       String
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  speaker      AgentSpeaker
+  message      String       @db.Text
+  
+  // Optional reference to specific code sections being discussed
+  codeDiffRef  String?      @db.Text  // GitHub diff URL or inline snippet
+  filePath     String?
+  lineStart    Int?
+  lineEnd      Int?
+  
+  // Scores/ratings from the review
+  qualityScore Float?       // 0-10 rating given by reviewing agent
+  
+  // Phase markers
+  phase        String?      // "implementation", "review", "synthesis"
+  round        Int          @default(1)
+
+  createdAt    DateTime     @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([taskId, speaker])
+}
+
+model Deployment {
+  id                    String                @id @default(cuid())
+  projectId             String
+  project               Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  branch                String
+  commitSha             String?
+  coolifyDeploymentUuid String?
+  status                DeploymentStatus      @default(QUEUED)
+  environment           DeploymentEnvironment @default(PREVIEW)
+  
+  previewUrl            String?
+  logs                  String?               @db.Text
+  
+  // Error tracking for self-healing loop
+  errorMessage          String?               @db.Text
+  healingAttempts       Int                   @default(0)
+  maxHealingAttempts    Int                   @default(3)
+  
+  triggeredBy           String?               // "auto" | "user" | "webhook"
+
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  @@index([projectId, status])
+  @@index([projectId, branch])
+  @@index([coolifyDeploymentUuid])
+}
+
+model ChatMessage {
+  id          String       @id @default(cuid())
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  role        String       // "user" | "assistant" | "system"
+  content     String       @db.Text
+  
+  // Metadata for step-by-step guidance
+  milestoneRef String?     // which milestone this message relates to
+  actionTaken  String?     // "created_issue", "installed_package", etc.
+
+  createdAt   DateTime     @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+// Global settings & encrypted credentials
+model GlobalSettings {
+  id                String   @id @default("singleton")
+  
+  defaultGithubToken    String?  @db.Text  // encrypted
+  defaultAnthropicKey   String?  @db.Text  // encrypted
+  defaultCoolifyUrl     String?
+  defaultCoolifyToken   String?  @db.Text  // encrypted
+  
+  redisUrl              String?  @default("redis://localhost:6379")
+  
+  autoModeIntervalMs    Int      @default(300000) // 5 minutes default cycle
+  maxConcurrentTasks    Int      @default(2)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}

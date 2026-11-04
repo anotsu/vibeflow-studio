@@ -1,0 +1,163 @@
+@import "@xterm/xterm/css/xterm.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode (fallback) */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 262 83% 58%;
+    --radius: 0.5rem;
+
+    /* Agent colors */
+    --claude: 24 95% 53%;
+    --claude-foreground: 0 0% 100%;
+    --claude-muted: 24 95% 53% / 0.15;
+    --antigravity: 210 100% 56%;
+    --antigravity-foreground: 0 0% 100%;
+    --antigravity-muted: 210 100% 56% / 0.15;
+    --synthesis: 142 71% 45%;
+    --synthesis-foreground: 0 0% 100%;
+
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 95%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 262 83% 58%;
+
+    /* Agent colors - dark mode */
+    --claude: 24 95% 58%;
+    --claude-foreground: 0 0% 100%;
+    --claude-muted: 24 95% 58% / 0.12;
+    --antigravity: 210 100% 60%;
+    --antigravity-foreground: 0 0% 100%;
+    --antigravity-muted: 210 100% 60% / 0.12;
+    --synthesis: 142 71% 50%;
+    --synthesis-foreground: 0 0% 100%;
+
+    --success: 142 71% 50%;
+    --warning: 38 92% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Terminal styling */
+.xterm {
+  padding: 8px;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: hsl(240 10% 6%);
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: hsl(240 4% 20%);
+  border-radius: 3px;
+}
+
+/* Custom scrollbar for the app */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(240 4% 20%);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(240 4% 30%);
+}
+
+/* Debate arena styling */
+.debate-message-claude {
+  border-left: 3px solid hsl(var(--claude));
+  background: hsl(var(--claude-muted));
+}
+
+.debate-message-antigravity {
+  border-left: 3px solid hsl(var(--antigravity));
+  background: hsl(var(--antigravity-muted));
+}
+
+/* Kanban column transitions */
+.kanban-card {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.kanban-card:hover {
+  @apply -translate-y-0.5 shadow-lg;
+}
+
+/* Mode toggle animation */
+.mode-toggle-auto {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Code diff styling */
+.diff-added {
+  @apply bg-green-500/10 border-l-2 border-green-500;
+}
+
+.diff-removed {
+  @apply bg-red-500/10 border-l-2 border-red-500;
+}
+
+.diff-modified {
+  @apply bg-yellow-500/10 border-l-2 border-yellow-500;
+}

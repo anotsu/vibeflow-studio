@@ -1,0 +1,252 @@
+// ============================================================
+// VibeFlow Studio — Dashboard Page (Main Workspace)
+// Real-time SSE integration, Settings modal & Reactive Updates
+// ============================================================
+"use client";
+
+import React, { useEffect, useState } from "react";
+import {
+  LayoutGrid,
+  GitCompareArrows,
+  Package,
+  Plus,
+  Loader2,
+} from "lucide-react";
+import { TopBar } from "@/components/layout/TopBar";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { CloudCLI } from "@/components/layout/CloudCLI";
+import { KanbanBoard } from "@/components/kanban/KanbanBoard";
+import { DualBranchArena } from "@/components/arena/DualBranchArena";
+import { Toolbox } from "@/components/toolbox/Toolbox";
+import { useProjectStore } from "@/stores/project-store";
+import { useUIStore } from "@/stores/ui-store";
+import type { WorkspaceTab } from "@/types";
+import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog";
+import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
+
+const WORKSPACE_TABS: Array<{
+  id: WorkspaceTab;
+  label: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    id: "kanban",
+    label: "Kanban & Tâches",
+    icon: <LayoutGrid className="w-3.5 h-3.5" />,
+  },
+  {
+    id: "arena",
+    label: "Arène Dual-Branch",
+    icon: <GitCompareArrows className="w-3.5 h-3.5" />,
+  },
+  {
+    id: "toolbox",
+    label: "Boîte à Outils",
+    icon: <Package className="w-3.5 h-3.5" />,
+  },
+];
+
+export default function DashboardPage() {
+  const {
+    projects,
+    selectedProject,
+    loading,
+    fetchProjects,
+    selectProject,
+    fetchTasks,
+    fetchToolbox,
+    fetchDeployments,
+  } = useProjectStore();
+
+  const {
+    activeWorkspaceTab,
+    setActiveWorkspaceTab,
+    cliPanelPosition,
+    cliPanelOpen,
+    selectedProjectId,
+    setSelectedProjectId,
+    addNotification,
+  } = useUIStore();
+
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+
+  // Initial load
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  // Auto-select project when selectedProjectId changes
+  useEffect(() => {
+    if (selectedProjectId) {
+      selectProject(selectedProjectId);
+    }
+  }, [selectedProjectId, selectProject]);
+
+  // Auto-select first project if none selected
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId, setSelectedProjectId]);
+
+  // ── Real-Time Server-Sent Events (SSE) Listener ─────────────
+  useEffect(() => {
+    if (!selectedProjectId) return;
+
+    const eventSource = new EventSource(`/api/events?projectId=${selectedProjectId}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === "DEBATE_MESSAGE") {
+          addNotification({
+            type: "info",
+            title: `Débat ${payload.data.log?.speaker || "Agent"}`,
+            message: payload.data.log?.message?.slice(0, 80) + "...",
+            autoDismissMs: 3000,
+          });
+        } else if (payload.type === "PHASE_CHANGED") {
+          fetchTasks(selectedProjectId);
+        } else if (payload.type === "DEPLOYMENT_STATUS") {
+          fetchDeployments(selectedProjectId);
+        } else if (payload.type === "TOOLBOX_UPDATED") {
+          fetchToolbox(selectedProjectId);
+        }
+      } catch (err) {
+        console.error("SSE parse error:", err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [selectedProjectId, fetchTasks, fetchDeployments, fetchToolbox, addNotification]);
+
+  if (loading && projects.length === 0) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">
+            Chargement de VibeFlow Studio...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state — no projects
+  if (projects.length === 0 && !loading) {
+    return (
+      <div className="h-screen flex flex-col bg-background">
+        <TopBar onOpenSettings={() => setShowSettingsDialog(true)} />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+              <LayoutGrid className="w-8 h-8 text-primary" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">
+              Bienvenue dans VibeFlow Studio
+            </h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Créez votre premier projet pour commencer le VibeCoding avec
+              l&apos;orchestration duale Claude × Antigravity.
+            </p>
+            <button
+              onClick={() => setShowCreateDialog(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Créer un projet
+            </button>
+          </div>
+        </div>
+        {showCreateDialog && (
+          <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />
+        )}
+        {showSettingsDialog && (
+          <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+        )}
+      </div>
+    );
+  }
+
+  const mainLayout =
+    cliPanelPosition === "bottom" ? "flex-col" : "flex-row";
+
+  return (
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Top Bar */}
+      <TopBar onOpenSettings={() => setShowSettingsDialog(true)} />
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar — Vibe Guide & Roadmap */}
+        <Sidebar />
+
+        {/* Center Workspace + CLI */}
+        <div className={`flex-1 flex ${mainLayout} overflow-hidden`}>
+          {/* Workspace */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Tab Bar */}
+            <div className="flex items-center border-b border-border px-4">
+              {WORKSPACE_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveWorkspaceTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+                    activeWorkspaceTab === tab.id
+                      ? "text-primary border-primary"
+                      : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+
+              {/* Action Buttons on right */}
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => setShowCreateDialog(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded-md transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  Nouveau projet
+                </button>
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-hidden">
+              {activeWorkspaceTab === "kanban" && <KanbanBoard />}
+              {activeWorkspaceTab === "arena" && <DualBranchArena />}
+              {activeWorkspaceTab === "toolbox" && <Toolbox />}
+            </div>
+          </div>
+
+          {/* CloudCLI Panel */}
+          {cliPanelOpen && <CloudCLI />}
+        </div>
+      </div>
+
+      {/* Floating CLI toggle when panel is closed */}
+      {!cliPanelOpen && <CloudCLI />}
+
+      {/* Create Project Dialog */}
+      {showCreateDialog && (
+        <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />
+      )}
+
+      {/* Global Settings Dialog */}
+      {showSettingsDialog && (
+        <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+      )}
+    </div>
+  );
+}
