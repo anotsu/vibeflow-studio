@@ -123,6 +123,10 @@ export async function POST(request: NextRequest) {
       githubToken,
       anthropicApiKey,
       coolifyApiToken,
+      milestones: customMilestones,
+      toolboxItems: customToolboxItems,
+      initialTasks: customTasks,
+      welcomeMessage,
     } = body;
 
     // ── Validate required fields ──────────────────────────────
@@ -172,7 +176,36 @@ export async function POST(request: NextRequest) {
       ? encrypt(coolifyApiToken)
       : null;
 
-    // ── Create project with default milestones in a transaction ─
+    // Prepare milestones
+    const milestonesToCreate = Array.isArray(customMilestones) && customMilestones.length > 0
+      ? customMilestones.map((m: any, idx: number) => ({
+          title: m.title || `Phase ${idx + 1}`,
+          description: m.description || "",
+          phase: m.phase || "MVP",
+          order: m.order || idx + 1,
+          status: m.status || (idx === 0 ? "IN_PROGRESS" : "PENDING"),
+        }))
+      : DEFAULT_MILESTONES.map((m) => ({
+          title: m.title,
+          description: m.description,
+          phase: m.phase,
+          order: m.order,
+          status: "PENDING" as const,
+        }));
+
+    // Prepare toolbox items
+    const toolboxToCreate = Array.isArray(customToolboxItems)
+      ? customToolboxItems.map((item: any) => ({
+          name: item.name,
+          category: item.category || "OTHER",
+          status: item.status || "MISSING",
+          description: item.description || null,
+          version: item.version || null,
+          sourceFile: item.sourceFile || null,
+        }))
+      : [];
+
+    // ── Create project with tailored milestones & toolbox in transaction ─
     const project = await prisma.project.create({
       data: {
         name: name.trim(),
@@ -186,20 +219,54 @@ export async function POST(request: NextRequest) {
         anthropicApiKey: encryptedAnthropicKey,
         coolifyApiToken: encryptedCoolifyToken,
         milestones: {
-          create: DEFAULT_MILESTONES.map((m) => ({
-            title: m.title,
-            description: m.description,
-            phase: m.phase,
-            order: m.order,
-          })),
+          create: milestonesToCreate,
+        },
+        toolboxItems: {
+          create: toolboxToCreate,
         },
       },
       include: {
         milestones: {
           orderBy: { order: "asc" },
         },
+        toolboxItems: true,
       },
     });
+
+    // Create initial tasks if provided
+    if (Array.isArray(customTasks) && customTasks.length > 0) {
+      for (const t of customTasks) {
+        const targetMilestone =
+          project.milestones.find((m) => m.order === (t.phaseOrder || 1)) ||
+          project.milestones[0];
+
+        await prisma.task.create({
+          data: {
+            projectId: project.id,
+            milestoneId: targetMilestone?.id || null,
+            title: t.title,
+            description: t.description || "",
+            priority: t.priority || "MEDIUM",
+            origin: "AI_GENERATED",
+            status: "BACKLOG",
+          },
+        }).catch((err) => console.warn("Failed to create initial task:", err));
+      }
+    }
+
+    // Create welcome ChatMessage for VibeGuide
+    const initialMessage =
+      welcomeMessage ||
+      `🎉 Projet **"${project.name}"** initialisé avec succès ! J'ai configuré les jalons et la boîte à outils. Quelle est votre priorité pour commencer ?`;
+
+    await prisma.chatMessage.create({
+      data: {
+        projectId: project.id,
+        role: "assistant",
+        content: initialMessage,
+        milestoneRef: project.milestones[0]?.id,
+      },
+    }).catch(() => {});
 
     // Strip encrypted tokens from the response
     const responseProject = {

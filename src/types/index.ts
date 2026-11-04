@@ -42,6 +42,28 @@ export interface CreateProjectInput {
   githubToken?: string;
   anthropicApiKey?: string;
   coolifyApiToken?: string;
+  milestones?: Array<{
+    title: string;
+    description: string;
+    phase: string;
+    order: number;
+    status?: string;
+  }>;
+  toolboxItems?: Array<{
+    name: string;
+    category: string;
+    status: string;
+    description?: string;
+    version?: string;
+    sourceFile?: string;
+  }>;
+  initialTasks?: Array<{
+    title: string;
+    description: string;
+    priority?: string;
+    phaseOrder?: number;
+  }>;
+  welcomeMessage?: string;
 }
 
 export interface CreateTaskInput {

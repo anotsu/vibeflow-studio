@@ -17,6 +17,7 @@ import {
   Plus,
   GitPullRequest,
   Check,
+  RefreshCw,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -44,6 +45,38 @@ export function Sidebar() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isRescanning, setIsRescanning] = useState(false);
+
+  const handleRescanGithub = async () => {
+    if (!selectedProject) return;
+    setIsRescanning(true);
+    try {
+      const res = await fetch(`/api/projects/${selectedProject.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "rescan_github" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        addNotification({
+          type: "success",
+          title: "Dépôt GitHub resynchronisé",
+          message: "La boîte à outils et le statut du projet ont été actualisés depuis GitHub.",
+          autoDismissMs: 4000,
+        });
+        await selectProject(selectedProject.id);
+      }
+    } catch {
+      addNotification({
+        type: "error",
+        title: "Erreur",
+        message: "Impossible de resynchroniser avec GitHub.",
+        autoDismissMs: 4000,
+      });
+    } finally {
+      setIsRescanning(false);
+    }
+  };
 
   if (!sidebarOpen) return null;
 
@@ -238,6 +271,15 @@ export function Sidebar() {
 
             {/* Quick Action Chips */}
             <div className="px-3 py-1.5 border-t border-border/60 bg-card/40 flex items-center gap-1.5 overflow-x-auto">
+              <button
+                onClick={handleRescanGithub}
+                disabled={isRescanning}
+                className="text-[10px] bg-secondary hover:bg-secondary/80 text-foreground px-2 py-1 rounded-md shrink-0 transition-colors flex items-center gap-1"
+                title="Resynchroniser le projet avec le dépôt GitHub"
+              >
+                <RefreshCw className={`w-2.5 h-2.5 ${isRescanning ? "animate-spin" : ""}`} />
+                <span>Sync GitHub</span>
+              </button>
               <button
                 onClick={() => handleSend("Quelle est l'étape suivante ?")}
                 disabled={isTyping}

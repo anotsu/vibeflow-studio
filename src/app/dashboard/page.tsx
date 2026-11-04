@@ -11,6 +11,7 @@ import {
   Package,
   Plus,
   Loader2,
+  FolderGit2,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -157,13 +158,15 @@ export default function DashboardPage() {
               Créez votre premier projet pour commencer le VibeCoding avec
               l&apos;orchestration duale Claude × Antigravity.
             </p>
-            <button
-              onClick={() => setShowCreateDialog(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Créer un projet
-            </button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                onClick={() => setShowCreateDialog(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+              >
+                <FolderGit2 className="w-4 h-4" />
+                Lire un GitHub & Générer le projet
+              </button>
+            </div>
           </div>
         </div>
         {showCreateDialog && (
@@ -214,10 +217,10 @@ export default function DashboardPage() {
               <div className="ml-auto flex items-center gap-2">
                 <button
                   onClick={() => setShowCreateDialog(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded-md transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 rounded-md transition-colors"
                 >
-                  <Plus className="w-3 h-3" />
-                  Nouveau projet
+                  <FolderGit2 className="w-3.5 h-3.5" />
+                  <span>Importer / Nouveau projet</span>
                 </button>
               </div>
             </div>
