@@ -32,7 +32,7 @@ import type { AgentDebateLog } from "@prisma/client";
 type ArenaView = "diff" | "debate" | "preview";
 
 export function DualBranchArena() {
-  const { tasks, debateLogs, fetchTaskDebate, deployments, selectedProject, selectProject } =
+  const { tasks, fetchTasks, debateLogs, fetchTaskDebate, deployments, selectedProject, selectProject } =
     useProjectStore();
   const { addNotification } = useUIStore();
 
@@ -41,13 +41,15 @@ export function DualBranchArena() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [diffMode, setDiffMode] = useState<"split" | "unified">("split");
 
-  // Filter tasks that have dual branches
+  // Filter tasks that have dual branches or candidate tasks
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const duelTasks = safeTasks.filter(
     (t) => t && (t.claudeBranch || t.antigravityBranch || t.status === "IN_DEBATE" || t.status === "SYNTHESIS")
   );
 
-  const selectedTask = duelTasks.find((t) => t.id === selectedTaskId) || duelTasks[0];
+  // If duel tasks exist, show them; otherwise allow challenging any project task
+  const displayTasks = duelTasks.length > 0 ? duelTasks : safeTasks;
+  const selectedTask = safeTasks.find((t) => t.id === selectedTaskId) || displayTasks[0];
 
   useEffect(() => {
     if (selectedTask?.id) {
@@ -93,6 +95,7 @@ export function DualBranchArena() {
 
       // Reload project and task debates
       await selectProject(selectedProject.id);
+      await fetchTasks(selectedProject.id);
       if (data.taskId) {
         setSelectedTaskId(data.taskId);
         await fetchTaskDebate(data.taskId);
@@ -123,18 +126,20 @@ export function DualBranchArena() {
 
           {/* Task selector chips */}
           <div className="flex items-center gap-1.5 ml-2 overflow-x-auto max-w-[420px]">
-            {duelTasks.map((task) => (
+            {displayTasks.map((task) => (
               <button
                 key={task.id}
                 onClick={() => setSelectedTaskId(task.id)}
-                className={`px-2.5 py-1 text-xs rounded-md font-medium transition-all truncate max-w-[180px] ${
+                className={`px-2.5 py-1 text-xs rounded-md font-medium transition-all truncate max-w-[180px] flex items-center gap-1 ${
                   selectedTaskId === task.id
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "bg-secondary text-muted-foreground hover:text-foreground"
                 }`}
                 title={task.title}
               >
-                {task.title}
+                {task.status === "SYNTHESIS" && <span>🏆</span>}
+                {task.status === "IN_DEBATE" && <span>⚔️</span>}
+                <span className="truncate">{task.title}</span>
               </button>
             ))}
           </div>
@@ -142,18 +147,19 @@ export function DualBranchArena() {
 
         {/* Right actions: Run Sim + View Switcher */}
         <div className="flex items-center gap-2">
-          {/* Simulate Button */}
+          {/* Real AI Duel Button */}
           <button
             onClick={handleRunSimulation}
             disabled={isSimulating}
             className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-gradient-to-r from-orange-500/20 via-primary/20 to-blue-500/20 hover:from-orange-500/30 hover:to-blue-500/30 text-foreground border border-border rounded-md transition-all shadow-sm disabled:opacity-50"
+            title="Lancer le duel croisé Claude Pro × Antigravity Pro sur cette tâche"
           >
             {isSimulating ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
             ) : (
-              <Play className="w-3.5 h-3.5 text-primary" />
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
             )}
-            <span>Simuler Duel</span>
+            <span>{isSimulating ? "Duel IA en cours..." : "⚡ Lancer Duel IA"}</span>
           </button>
 
           {/* View Mode Switcher */}

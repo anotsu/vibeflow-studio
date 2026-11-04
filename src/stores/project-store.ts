@@ -229,7 +229,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(`/api/agents/debate/${taskId}`);
       if (!res.ok) throw new Error("Failed to fetch debate");
       const data = await res.json();
-      set({ debateLogs: Array.isArray(data) ? data : [] });
+      const logs = Array.isArray(data) ? data : (Array.isArray(data?.flat) ? data.flat : []);
+      set({ debateLogs: logs });
     } catch (error) {
       console.error("fetchTaskDebate error:", error);
       set({ debateLogs: [] });
@@ -272,7 +273,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(`/api/deployments?projectId=${projectId}`);
       if (!res.ok) throw new Error("Failed to fetch deployments");
       const data = await res.json();
-      set({ deployments: Array.isArray(data) ? data : [] });
+      const deployments = Array.isArray(data) ? data : (Array.isArray(data?.deployments) ? data.deployments : (data?.flat || []));
+      set({ deployments });
     } catch (error) {
       console.error("fetchDeployments error:", error);
       set({ deployments: [] });

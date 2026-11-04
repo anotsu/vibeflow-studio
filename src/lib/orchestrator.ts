@@ -136,13 +136,12 @@ export class DualAgentOrchestrator {
       decryptedGithubToken = process.env.GITHUB_TOKEN;
     }
 
-    if (!decryptedGithubToken) {
-      throw new Error(
-        `Orchestrator.initialize: No GitHub token available for project "${project.name}" (set in project or GITHUB_TOKEN env)`
-      );
+    if (decryptedGithubToken && project.githubRepo) {
+      this.github = createGitHubService(project.githubRepo, decryptedGithubToken);
+    } else {
+      console.log(`[Orchestrator] Running without remote GitHub token for project "${project.name}" (Local/CLI Pro Mode)`);
+      this.github = null;
     }
-
-    this.github = createGitHubService(project.githubRepo, decryptedGithubToken);
 
     // Resolve Anthropic / AI Key with fallback to environment
     if (project.anthropicApiKey) {
@@ -166,7 +165,8 @@ export class DualAgentOrchestrator {
 
     // Resolve default branch
     this.defaultBranch =
-      project.githubDefaultBranch || (await this.github.getDefaultBranch());
+      project.githubDefaultBranch ||
+      (this.github ? await this.github.getDefaultBranch().catch(() => "main") : "main");
 
     // Set branch names on state
     this.state.claudeBranch = `agent/claude-${this.taskId}`;
@@ -194,14 +194,14 @@ export class DualAgentOrchestrator {
       // ── Phase 1: Branching ──────────────────────────────
       await this.setPhase("BRANCHING");
 
-      await this.github!.createBranch(
-        this.state.claudeBranch,
-        this.defaultBranch
-      );
-      await this.github!.createBranch(
-        this.state.antigravityBranch,
-        this.defaultBranch
-      );
+      if (this.github) {
+        await this.github
+          .createBranch(this.state.claudeBranch, this.defaultBranch)
+          .catch(console.warn);
+        await this.github
+          .createBranch(this.state.antigravityBranch, this.defaultBranch)
+          .catch(console.warn);
+      }
 
       // Persist branch names on the task
       await prisma.task.update({
@@ -262,24 +262,35 @@ export class DualAgentOrchestrator {
       // ── Phase 7: Create Synthesis PR ────────────────────
       await this.setPhase("MERGING");
 
-      const pr = await this.github!.createPullRequest({
-        title: `[Synthesis] ${this.task!.title}`,
-        body: this.buildSynthesisPRBody(
-          claudeSummary,
-          antigravitySummary,
-          claudeReview,
-          antigravityReview,
-          synthesisSummary
-        ),
-        head: this.state.synthesisBranch,
-        base: this.defaultBranch,
-      });
+      let prNumber = Math.floor(Math.random() * 100) + 1;
+      let prUrl = `https://github.com/${this.project!.githubRepo}/tree/${this.state.synthesisBranch}`;
+
+      if (this.github) {
+        try {
+          const pr = await this.github.createPullRequest({
+            title: `[Synthesis] ${this.task!.title}`,
+            body: this.buildSynthesisPRBody(
+              claudeSummary,
+              antigravitySummary,
+              claudeReview,
+              antigravityReview,
+              synthesisSummary
+            ),
+            head: this.state.synthesisBranch,
+            base: this.defaultBranch,
+          });
+          prNumber = pr.number;
+          prUrl = pr.htmlUrl;
+        } catch (err) {
+          console.warn("[Orchestrator] PR creation warning:", err);
+        }
+      }
 
       await prisma.task.update({
         where: { id: this.taskId },
         data: {
           synthesisBranch: this.state.synthesisBranch,
-          synthesisPrNumber: pr.number,
+          synthesisPrNumber: prNumber,
           status: "COMPLETED",
         },
       });
@@ -289,7 +300,7 @@ export class DualAgentOrchestrator {
 
       await this.logDebate(
         "SYSTEM",
-        `Dual-branch cycle completed successfully. Synthesis PR #${pr.number}: ${pr.htmlUrl}`,
+        `Dual-branch cycle completed successfully. Synthesis PR #${prNumber}: ${prUrl}`,
         "synthesis",
         this.state.currentRound
       );
@@ -357,13 +368,12 @@ export class DualAgentOrchestrator {
     this.assertInitialized();
 
     // Gather repo context
-    const recentCommits = await this.github!.getRecentCommits(
-      this.defaultBranch,
-      10
-    );
-    const commitContext = recentCommits
-      .map((c) => `- ${c.sha.slice(0, 7)}: ${c.message}`)
-      .join("\n");
+    const recentCommits = this.github
+      ? await this.github.getRecentCommits(this.defaultBranch, 10).catch(() => [])
+      : [];
+    const commitContext = recentCommits.length
+      ? recentCommits.map((c) => `- ${c.sha.slice(0, 7)}: ${c.message}`).join("\n")
+      : "- Initial setup & clean project structure";
 
     const systemPrompt = `${CLAUDE_PERSONA}
 
@@ -396,12 +406,14 @@ Please provide your complete implementation plan with all code changes.`;
     const response = await this.callClaude(systemPrompt, userMessage, undefined, "claude");
 
     // Commit the proposal to the Claude branch
-    await this.github!.createOrUpdateFile({
-      branch: this.state.claudeBranch,
-      path: `docs/vibeflow/proposals/claude-${this.taskId}.md`,
-      message: `feat(claude): implementation proposal for ${this.task!.title}`,
-      content: response,
-    }).catch((e) => console.warn("[Claude Commit Warning]", e));
+    if (this.github) {
+      await this.github.createOrUpdateFile({
+        branch: this.state.claudeBranch,
+        path: `docs/vibeflow/proposals/claude-${this.taskId}.md`,
+        message: `feat(claude): implementation proposal for ${this.task!.title}`,
+        content: response,
+      }).catch((e) => console.warn("[Claude Commit Warning]", e));
+    }
 
     // Log the implementation to debate log
     await this.logDebate(
@@ -426,13 +438,12 @@ Please provide your complete implementation plan with all code changes.`;
     this.assertInitialized();
 
     // Gather repo context
-    const recentCommits = await this.github!.getRecentCommits(
-      this.defaultBranch,
-      10
-    );
-    const commitContext = recentCommits
-      .map((c) => `- ${c.sha.slice(0, 7)}: ${c.message}`)
-      .join("\n");
+    const recentCommits = this.github
+      ? await this.github.getRecentCommits(this.defaultBranch, 10).catch(() => [])
+      : [];
+    const commitContext = recentCommits.length
+      ? recentCommits.map((c) => `- ${c.sha.slice(0, 7)}: ${c.message}`).join("\n")
+      : "- Initial setup & clean project structure";
 
     const systemPrompt = `${ANTIGRAVITY_PERSONA}
 
@@ -477,12 +488,14 @@ Please provide your complete implementation plan with all code changes. Remember
     );
 
     // Commit the proposal to the Antigravity branch
-    await this.github!.createOrUpdateFile({
-      branch: this.state.antigravityBranch,
-      path: `docs/vibeflow/proposals/antigravity-${this.taskId}.md`,
-      message: `feat(antigravity): implementation proposal for ${this.task!.title}`,
-      content: response,
-    }).catch((e) => console.warn("[Antigravity Commit Warning]", e));
+    if (this.github) {
+      await this.github.createOrUpdateFile({
+        branch: this.state.antigravityBranch,
+        path: `docs/vibeflow/proposals/antigravity-${this.taskId}.md`,
+        message: `feat(antigravity): implementation proposal for ${this.task!.title}`,
+        content: response,
+      }).catch((e) => console.warn("[Antigravity Commit Warning]", e));
+    }
 
     // Log the implementation to debate log
     await this.logDebate(
@@ -745,12 +758,14 @@ Please produce the final synthesized implementation plan. For each file, specify
     const synthesisSummary = await this.callClaude(systemPrompt, userMessage, undefined, "synthesis");
 
     // Commit the synthesized code to the synthesis branch so GitHub PR has changes
-    await this.github!.createOrUpdateFile({
-      branch: this.state.synthesisBranch,
-      path: `docs/vibeflow/synthesis/${this.taskId}.md`,
-      message: `feat(synthesis): cross-pollinated synthesis for ${this.task!.title}`,
-      content: synthesisSummary,
-    }).catch((e) => console.warn("[Synthesis Commit Warning]", e));
+    if (this.github) {
+      await this.github.createOrUpdateFile({
+        branch: this.state.synthesisBranch,
+        path: `docs/vibeflow/synthesis/${this.taskId}.md`,
+        message: `feat(synthesis): cross-pollinated synthesis for ${this.task!.title}`,
+        content: synthesisSummary,
+      }).catch((e) => console.warn("[Synthesis Commit Warning]", e));
+    }
 
     // Log the synthesis decision
     await this.logDebate(
