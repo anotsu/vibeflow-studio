@@ -32,7 +32,16 @@ export async function executeTaskOrchestration(
     await orchestrator.initialize();
     const finalState = await orchestrator.startDualBranchCycle();
 
-    console.log(`[Worker] Dual-Branch cycle completed for task ${taskId}:`, {
+    if (finalState.phase === "FAILED") {
+      console.error(`[Worker] Orchestrator ended in FAILED phase for task ${taskId}:`, finalState.errors);
+      broadcastVibeEvent("PHASE_CHANGED", projectId, {
+        phase: "FAILED",
+        errors: finalState.errors,
+      }, taskId);
+      return;
+    }
+
+    console.log(`[Worker] Dual-Branch cycle completed successfully for task ${taskId}:`, {
       claudeScore: finalState.claudeScore,
       antigravityScore: finalState.antigravityScore,
       synthesisBranch: finalState.synthesisBranch,

@@ -103,6 +103,22 @@ export class GitHubService {
     try {
       const baseBranch = fromBranch ?? (await this.getDefaultBranch());
 
+      // If branch already exists, return it idempotently
+      try {
+        const { data: existingRef } = await this.octokit.rest.git.getRef({
+          owner: this.owner,
+          repo: this.repo,
+          ref: `heads/${branchName}`,
+        });
+        return {
+          name: branchName,
+          sha: existingRef.object.sha,
+          protected: false,
+        };
+      } catch {
+        // Doesn't exist, proceed to create
+      }
+
       // Get the SHA of the base branch's HEAD
       const { data: refData } = await this.octokit.rest.git.getRef({
         owner: this.owner,
