@@ -27,6 +27,7 @@ import {
   Search,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
+import { useUIStore } from "@/stores/ui-store";
 import type { ToolboxItem } from "@prisma/client";
 
 const CATEGORY_CONFIG: Record<
@@ -102,7 +103,14 @@ export function Toolbox() {
     selectedProject,
     fetchToolbox,
     triggerToolboxScan,
+    createTask,
   } = useProjectStore();
+  const {
+    addNotification,
+    setActiveWorkspaceTab,
+    setCliPanelOpen,
+    setActiveCliTab,
+  } = useUIStore();
 
   useEffect(() => {
     if (selectedProject) {
@@ -120,6 +128,55 @@ export function Toolbox() {
   const handleScan = () => {
     if (selectedProject) {
       triggerToolboxScan(selectedProject.id);
+    }
+  };
+
+  const handleInstallViaCli = (item: ToolboxItem) => {
+    setActiveCliTab("bash");
+    setCliPanelOpen(true);
+    addNotification({
+      type: "info",
+      title: `Installation de ${item.name}`,
+      message: `Terminal ouvert. Commande suggérée : npm install ${item.name.toLowerCase().replace(/[^a-z0-9-]/g, "")}`,
+      autoDismissMs: 5000,
+    });
+  };
+
+  const handleCreateTask = async (item: ToolboxItem) => {
+    if (!selectedProject) return;
+    try {
+      const task = await createTask({
+        projectId: selectedProject.id,
+        title: `Intégration & Configuration : ${item.name}`,
+        description: `Installer, configurer les variables d'environnement et valider les routes pour ${item.name} (${item.description || item.category}).`,
+        priority: "HIGH",
+        origin: "USER",
+      });
+
+      // Update toolbox item status to IN_PROGRESS
+      await fetch(`/api/toolbox/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "IN_PROGRESS" }),
+      }).catch(() => {});
+
+      addNotification({
+        type: "success",
+        title: "Tâche créée !",
+        message: `Tâche "${task.title}" ajoutée au Kanban. Les agents peuvent maintenant démarrer le duel.`,
+        autoDismissMs: 4000,
+      });
+
+      // Refresh toolbox & switch to kanban tab
+      await fetchToolbox(selectedProject.id);
+      setActiveWorkspaceTab("kanban");
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur",
+        message: err.message || "Impossible de créer la tâche",
+        autoDismissMs: 4000,
+      });
     }
   };
 
@@ -209,7 +266,13 @@ export function Toolbox() {
 
           <div className="space-y-2">
             {missing.map((item) => (
-              <ToolboxCard key={item.id} item={item} showActions />
+              <ToolboxCard
+                key={item.id}
+                item={item}
+                showActions
+                onInstallViaCli={handleInstallViaCli}
+                onCreateAgentTask={handleCreateTask}
+              />
             ))}
 
             {missing.length === 0 && (
@@ -231,9 +294,13 @@ export function Toolbox() {
 function ToolboxCard({
   item,
   showActions = false,
+  onInstallViaCli,
+  onCreateAgentTask,
 }: {
   item: ToolboxItem;
   showActions?: boolean;
+  onInstallViaCli?: (item: ToolboxItem) => void;
+  onCreateAgentTask?: (item: ToolboxItem) => void;
 }) {
   const category = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.OTHER;
 
@@ -286,13 +353,19 @@ function ToolboxCard({
       {/* Action Buttons (for missing items) */}
       {showActions && item.status === "MISSING" && (
         <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border">
-          <button className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors">
+          <button
+            onClick={() => onInstallViaCli?.(item)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
+          >
             <Download className="w-3 h-3" />
             Installer via CloudCLI
           </button>
-          <button className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium bg-secondary text-muted-foreground hover:text-foreground rounded-md transition-colors">
+          <button
+            onClick={() => onCreateAgentTask?.(item)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium bg-secondary text-muted-foreground hover:text-foreground rounded-md transition-colors"
+          >
             <Plus className="w-3 h-3" />
-            Créer une tâche agent
+            Créer tâche duel agent
           </button>
         </div>
       )}
