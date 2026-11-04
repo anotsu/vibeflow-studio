@@ -9,6 +9,7 @@ WORKDIR /app
 
 # 2. Dependencies
 FROM base AS deps
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci
 
