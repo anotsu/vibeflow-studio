@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   serverExternalPackages: ["node-pty"],
   webpack: (config: any, { isServer }: { isServer: boolean }) => {
     if (!isServer) {
