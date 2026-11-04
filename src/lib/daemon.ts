@@ -24,7 +24,7 @@ export async function runAutonomousDaemonTick(
   targetProjectId?: string
 ): Promise<DaemonTickResult> {
   const whereClause = targetProjectId
-    ? { id: targetProjectId, mode: "AUTO" as const }
+    ? { id: targetProjectId }
     : { mode: "AUTO" as const };
 
   const autoProjects = await prisma.project.findMany({
