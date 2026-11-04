@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { enqueueAgentExecution } from "@/lib/queue";
+import { triggerSelfHealing } from "@/lib/self-healing";
 
 /** Map Coolify status strings to our DeploymentStatus enum */
 function mapCoolifyStatus(
@@ -128,32 +128,20 @@ export async function POST(request: NextRequest) {
       data: updateData,
     });
 
-    // ── Self-healing: enqueue fix job on failure ───────────────
+    // ── Self-healing: trigger automated diagnosis & fix loop ───────────────
+    let selfHealingResult = null;
     if (
       mappedStatus === "FAILED" &&
       updatedDeployment.healingAttempts < updatedDeployment.maxHealingAttempts
     ) {
-      // Increment healing attempts
-      await prisma.deployment.update({
-        where: { id: deployment.id },
-        data: { healingAttempts: { increment: 1 } },
-      });
-
-      const errorContext =
-        updateData.errorMessage || "Unknown deployment error";
-
-      // Enqueue an agent execution job to analyze and fix the error
-      await enqueueAgentExecution({
-        taskId: deployment.id, // Use deployment ID as reference
-        projectId: deployment.projectId,
-        agent: "CLAUDE",
-        branch: deployment.branch,
-        prompt: `Deployment to branch "${deployment.branch}" failed with error:\n\n${errorContext}\n\nAnalyze the error and provide a fix. This is self-healing attempt ${updatedDeployment.healingAttempts + 1} of ${updatedDeployment.maxHealingAttempts}.`,
-      });
-
-      console.log(
-        `[Coolify Webhook] Self-healing triggered for deployment ${deployment.id} (attempt ${updatedDeployment.healingAttempts + 1}/${updatedDeployment.maxHealingAttempts})`
-      );
+      try {
+        selfHealingResult = await triggerSelfHealing(deployment.id);
+        console.log(
+          `[Coolify Webhook] Self-healing successfully executed for deployment ${deployment.id}`
+        );
+      } catch (err: any) {
+        console.error(`[Coolify Webhook] Self-healing trigger failed:`, err);
+      }
     }
 
     return NextResponse.json({
@@ -161,6 +149,7 @@ export async function POST(request: NextRequest) {
       processed: true,
       deploymentId: deployment.id,
       status: mappedStatus,
+      selfHealing: selfHealingResult,
     });
   } catch (error) {
     console.error("[POST /api/webhooks/coolify] Error:", error);

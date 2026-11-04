@@ -34,6 +34,8 @@ import {
   X,
   AlertTriangle,
   Code2,
+  GitPullRequest,
+  Sliders,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -52,6 +54,7 @@ export function DualBranchArena() {
   const [activeView, setActiveView] = useState<ArenaView>("debate");
   const [isSimulating, setIsSimulating] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+  const [isCreatingPR, setIsCreatingPR] = useState(false);
   const [diffMode, setDiffMode] = useState<"split" | "unified" | "synthesis">("split");
 
   // Sandbox benchmark state
@@ -114,6 +117,44 @@ export function DualBranchArena() {
       });
     } finally {
       setIsMerging(false);
+    }
+  };
+
+  // Trigger GitHub PR creation with badges & benchmark report
+  const handleCreatePR = async (taskId: string) => {
+    setIsCreatingPR(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/github-pr`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Erreur génération PR GitHub");
+      const data = await res.json();
+      if (data.prUrl) {
+        window.open(data.prUrl, "_blank");
+        addNotification({
+          type: "success",
+          title: "Pull Request GitHub Créée !",
+          message: `La PR #${data.prNumber} a été ouverte sur GitHub avec les badges.`,
+          autoDismissMs: 5000,
+        });
+      } else if (data.prefilledUrl) {
+        window.open(data.prefilledUrl, "_blank");
+        addNotification({
+          type: "success",
+          title: "PR GitHub Pré-remplie !",
+          message: "L'interface GitHub s'est ouverte avec tous les badges et le diff de synthèse.",
+          autoDismissMs: 5000,
+        });
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur GitHub PR",
+        message: err.message,
+        autoDismissMs: 4000,
+      });
+    } finally {
+      setIsCreatingPR(false);
     }
   };
 
@@ -313,6 +354,8 @@ export function DualBranchArena() {
               logs={debateLogs}
               onMergeTask={handleMergeTask}
               isMerging={isMerging}
+              onCreatePR={handleCreatePR}
+              isCreatingPR={isCreatingPR}
             />
           )}
           {activeView === "diff" && (
@@ -350,11 +393,15 @@ function DebateView({
   logs,
   onMergeTask,
   isMerging,
+  onCreatePR,
+  isCreatingPR,
 }: {
   task: TaskWithRelations;
   logs: AgentDebateLog[];
   onMergeTask?: (taskId: string) => void;
   isMerging?: boolean;
+  onCreatePR?: (taskId: string) => void;
+  isCreatingPR?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const safeLogs = Array.isArray(logs) ? logs : [];
@@ -475,20 +522,38 @@ function DebateView({
                 : "💡 Vérifiez la décision ci-dessus avant de fusionner dans la branche principale."}
             </span>
 
-            {task.status !== "COMPLETED" && onMergeTask && (
-              <button
-                onClick={() => onMergeTask(task.id)}
-                disabled={isMerging}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg text-xs font-semibold transition-all shadow-md disabled:opacity-50"
-              >
-                {isMerging ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <GitMerge className="w-3.5 h-3.5" />
-                )}
-                <span>Valider & Fusionner dans main</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {onCreatePR && (
+                <button
+                  onClick={() => onCreatePR(task.id)}
+                  disabled={isCreatingPR}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#24292e] hover:bg-[#2f363d] text-white border border-white/10 rounded-lg text-xs font-semibold transition-all shadow-sm disabled:opacity-50"
+                  title="Ouvrir une Pull Request sur GitHub avec le rapport de duel et les badges"
+                >
+                  {isCreatingPR ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <GitPullRequest className="w-3.5 h-3.5 text-primary" />
+                  )}
+                  <span>Créer PR GitHub</span>
+                </button>
+              )}
+
+              {task.status !== "COMPLETED" && onMergeTask && (
+                <button
+                  onClick={() => onMergeTask(task.id)}
+                  disabled={isMerging}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg text-xs font-semibold transition-all shadow-md disabled:opacity-50"
+                >
+                  {isMerging ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <GitMerge className="w-3.5 h-3.5" />
+                  )}
+                  <span>Valider & Fusionner dans main</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1297,7 +1362,8 @@ function PreviewView({
 }) {
   const [previewMode, setPreviewMode] = useState<"sandbox" | "coolify">("sandbox");
   const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [activeBranchTab, setActiveBranchTab] = useState<"split" | "claude" | "antigravity" | "synthesis">("split");
+  const [activeBranchTab, setActiveBranchTab] = useState<"split" | "claude" | "antigravity" | "synthesis" | "slider">("split");
+  const [sliderPosition, setSliderPosition] = useState(50);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const claudeHtml = generatePreviewHtml(task, "claude");
@@ -1379,6 +1445,16 @@ function PreviewView({
                   <Trophy className="w-3 h-3" /> Synthèse
                 </button>
               )}
+              <button
+                onClick={() => setActiveBranchTab("slider")}
+                className={`px-2 py-0.5 rounded transition-all flex items-center gap-1 ${
+                  activeBranchTab === "slider" ? "bg-card text-foreground font-bold shadow-sm text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Superposition interactive avec curseur de diff graphique"
+              >
+                <Sliders className="w-3 h-3 text-primary" />
+                <span>Curseur Superposé</span>
+              </button>
             </div>
           )}
         </div>
@@ -1496,6 +1572,71 @@ function PreviewView({
                 title="Antigravity Simulator"
                 sandbox="allow-scripts allow-modals"
               />
+            </div>
+          ) : activeBranchTab === "slider" ? (
+            <div className={`flex-1 flex flex-col h-full ${viewportStyles[viewport]} relative overflow-hidden rounded-xl border border-border/80 bg-card`}>
+              {/* Slider Top Controller Bar */}
+              <div className="px-3 py-1.5 bg-[#121215] border-b border-border/60 flex items-center justify-between text-xs font-mono">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-bold text-foreground">Curseur Visuel Superposé</span>
+                  <span className="text-[10px] text-muted-foreground">({sliderPosition}% Claude / {100 - sliderPosition}% Antigravity)</span>
+                </div>
+                <div className="flex items-center gap-3 w-64">
+                  <span className="text-[10px] font-bold text-claude">Claude</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={sliderPosition}
+                    onChange={(e) => setSliderPosition(Number(e.target.value))}
+                    className="flex-1 accent-primary h-1.5 cursor-ew-resize bg-secondary rounded-lg"
+                  />
+                  <span className="text-[10px] font-bold text-antigravity">Antigravity</span>
+                </div>
+              </div>
+
+              {/* Stacked iFrames with clip-path */}
+              <div className="flex-1 relative w-full h-full overflow-hidden select-none">
+                {/* Bottom Layer: Antigravity */}
+                <iframe
+                  key={`slider-anti-${refreshKey}`}
+                  srcDoc={antigravityHtml}
+                  className="absolute inset-0 w-full h-full bg-[#09090b] border-none pointer-events-none"
+                  title="Antigravity Background"
+                />
+
+                {/* Top Layer: Claude (clipped) */}
+                <div
+                  className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none"
+                  style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
+                >
+                  <iframe
+                    key={`slider-claude-${refreshKey}`}
+                    srcDoc={claudeHtml}
+                    className="w-full h-full bg-[#09090b] border-none"
+                    title="Claude Foreground"
+                  />
+                </div>
+
+                {/* Visual Divider Bar */}
+                <div
+                  className="absolute top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-white to-primary shadow-[0_0_12px_rgba(168,85,247,0.8)] z-20 cursor-ew-resize flex items-center justify-center pointer-events-auto"
+                  style={{ left: `${sliderPosition}%`, transform: "translateX(-50%)" }}
+                >
+                  <div className="w-7 h-7 rounded-full bg-black/90 border-2 border-primary shadow-xl flex items-center justify-center text-[10px] text-primary font-bold">
+                    <ArrowLeftRight className="w-3.5 h-3.5 text-white" />
+                  </div>
+                </div>
+
+                {/* Dynamic Watermark labels */}
+                <div className="absolute top-3 left-3 z-30 pointer-events-none px-2 py-0.5 rounded bg-claude/20 text-claude border border-claude/40 text-[10px] font-mono font-bold backdrop-blur-sm">
+                  🟠 Claude Code ({sliderPosition}%)
+                </div>
+                <div className="absolute top-3 right-3 z-30 pointer-events-none px-2 py-0.5 rounded bg-antigravity/20 text-antigravity border border-antigravity/40 text-[10px] font-mono font-bold backdrop-blur-sm">
+                  🔵 Antigravity ({100 - sliderPosition}%)
+                </div>
+              </div>
             </div>
           ) : (
             <div className={`flex-1 flex flex-col rounded-xl overflow-hidden border border-synthesis/40 bg-card ${viewportStyles[viewport]}`}>

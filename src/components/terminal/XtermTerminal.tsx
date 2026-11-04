@@ -148,7 +148,7 @@ export function XtermTerminal({
 
         // User input handling
         let localBuffer = "";
-        term.onData((data: string) => {
+        term.onData(async (data: string) => {
           if (socket.connected) {
             socket.emit("terminal:input", {
               sessionId: sessionIdRef.current,
@@ -160,7 +160,7 @@ export function XtermTerminal({
               term.writeln("");
               const cmd = localBuffer.trim();
               if (cmd) {
-                handleLocalSimulation(cmd, term, target);
+                await handleLocalSimulation(cmd, term, target, projectId);
               }
               localBuffer = "";
               term.write(`\x1b[32m${target}>\x1b[0m `);
@@ -263,34 +263,47 @@ export function XtermTerminal({
   );
 }
 
-// Emulated responses for interactive offline experience
-function handleLocalSimulation(cmd: string, term: any, target: TerminalTarget) {
+// Interactive command runner connected to /api/terminal/execute
+async function handleLocalSimulation(
+  cmd: string,
+  term: any,
+  target: TerminalTarget,
+  projectId?: string
+) {
   const lower = cmd.toLowerCase();
   if (lower === "clear" || lower === "cls") {
     term.clear();
     return;
   }
+
+  try {
+    const res = await fetch("/api/terminal/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command: cmd, target, projectId }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.output) {
+        term.write(data.output);
+        return;
+      }
+    }
+  } catch (err) {
+    // Fall through to offline handling
+  }
+
+  // Fallback offline responses if API is unreachable
   if (lower === "help") {
     term.writeln(`\x1b[36mCommandes disponibles :\x1b[0m`);
     term.writeln(`  claude <prompt>      - Envoyer un prompt d'analyse à Claude`);
     term.writeln(`  antigravity <prompt> - Envoyer une directive à Antigravity`);
-    term.writeln(`  @broadcast <prompt>  - Diffuser simultanément aux deux agents`);
+    term.writeln(`  git status           - Statut du dépôt Git local`);
     term.writeln(`  coolify status       - Vérifier l'état du serveur Coolify`);
-    term.writeln(`  status               - Résumé Git & environnement`);
+    term.writeln(`  status               - Résumé global`);
     return;
   }
 
-  if (lower.startsWith("claude")) {
-    term.writeln(`\x1b[33m[Claude Agent]\x1b[0m Analyse de l'architecture et préparation du plan de refactoring...`);
-    term.writeln(`\x1b[32m✔ Proposition générée sur branche agent/claude-demo\x1b[0m`);
-  } else if (lower.startsWith("antigravity")) {
-    term.writeln(`\x1b[34m[Antigravity Agent]\x1b[0m Optimisation UI/UX, intégration Tailwind et vérification des perfs...`);
-    term.writeln(`\x1b[32m✔ Proposition générée sur branche agent/antigravity-demo\x1b[0m`);
-  } else if (lower.startsWith("@broadcast")) {
-    term.writeln(`\x1b[35m[Broadcast]\x1b[0m Prompt transmis à Claude et Antigravity simultanément.`);
-  } else if (lower.includes("coolify")) {
-    term.writeln(`\x1b[32m[Coolify API]\x1b[0m Endpoint: Live (Preview Deployments activés).`);
-  } else {
-    term.writeln(`\x1b[2;37mExecuted:\x1b[0m ${cmd}`);
-  }
+  term.writeln(`\x1b[2;37mExecuted:\x1b[0m ${cmd}\r\n`);
 }
