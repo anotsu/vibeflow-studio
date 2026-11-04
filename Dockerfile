@@ -32,14 +32,20 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
+RUN apk add --no-cache bash git curl
 
-# Utilisateur non-root sécurisé
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Install Claude Code CLI globally for Claude Pro accounts
+RUN npm install -g @anthropic-ai/claude-code
+
+# Utilisateur non-root sécurisé avec home directory pour la persistance des sessions CLI
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 --home /home/nextjs nextjs && \
+    mkdir -p /home/nextjs/.claude /home/nextjs/.gemini && \
+    chown -R nextjs:nodejs /home/nextjs
+
+# Copy and install Antigravity CLI globally for Gemini Pro accounts
+COPY scripts/antigravity-cli.js /usr/local/bin/antigravity
+RUN chmod +x /usr/local/bin/antigravity && ln -s /usr/local/bin/antigravity /usr/local/bin/agy
 
 # Fichiers statiques et build standalone Next.js
 COPY --from=builder /app/public ./public
@@ -48,6 +54,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 
 USER nextjs
+ENV HOME=/home/nextjs
 
 EXPOSE 3000
 

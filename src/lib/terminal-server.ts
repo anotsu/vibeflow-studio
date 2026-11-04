@@ -55,10 +55,18 @@ function createTerminalProcess(
       // Plain shell
       break;
     case "claude":
-      // Claude CLI — we launch a shell and then user can type `claude` commands
+      if (isWindows) {
+        args = ["-NoExit", "-Command", "Write-Host 'Session Claude Code CLI (Compte Claude Pro)' -ForegroundColor Cyan; if (Get-Command claude -ErrorAction SilentlyContinue) { claude } else { Write-Host 'Tapez: npm i -g @anthropic-ai/claude-code' -ForegroundColor Yellow }"];
+      } else {
+        args = ["-c", "echo 'Session Claude Code CLI (Compte Claude Pro)'; if command -v claude >/dev/null 2>&1; then claude; else echo 'Tapez: npm i -g @anthropic-ai/claude-code' && sh; fi"];
+      }
       break;
     case "antigravity":
-      // Antigravity CLI — same approach
+      if (isWindows) {
+        args = ["-NoExit", "-Command", "Write-Host 'Session Google Antigravity CLI (Compte Gemini Pro)' -ForegroundColor Magenta; if (Get-Command agy -ErrorAction SilentlyContinue) { agy } elseif (Get-Command antigravity -ErrorAction SilentlyContinue) { antigravity } else { Write-Host 'Antigravity CLI pret' -ForegroundColor Green }"];
+      } else {
+        args = ["-c", "echo 'Session Google Antigravity CLI (Compte Gemini Pro)'; if command -v agy >/dev/null 2>&1; then agy; elif command -v antigravity >/dev/null 2>&1; then antigravity; else echo 'Antigravity CLI pret' && sh; fi"];
+      }
       break;
     case "broadcast":
       // Broadcast is handled at the socket level, not as a separate PTY

@@ -1,8 +1,11 @@
 // ============================================================
 // VibeFlow Studio — Unified AI Provider & Model Router
-// Supports Anthropic (Claude), Google Gemini & Heuristic Fallback
+// PRIORITY 1 (DEFAULT) : Official CLIs (Claude Code CLI & Antigravity CLI)
+// PRIORITY 2 (OPTIONAL) : API Tokens (Anthropic / Gemini)
+// PRIORITY 3 (FALLBACK) : Intelligent Heuristic Engine
 // ============================================================
 
+import { spawn } from "child_process";
 import Anthropic from "@anthropic-ai/sdk";
 
 export interface AICallParams {
@@ -13,28 +16,139 @@ export interface AICallParams {
   geminiApiKey?: string | null;
   temperature?: number;
   maxTokens?: number;
+  preferCli?: boolean;
 }
 
 export interface AIResponse {
   content: string;
-  provider: "anthropic" | "gemini" | "heuristic";
+  provider: "claude-cli" | "antigravity-cli" | "anthropic-api" | "gemini-api" | "heuristic";
   modelUsed: string;
 }
 
 /**
+ * Execute a command-line agent via spawn safely with timeout.
+ */
+function spawnCli(
+  cmd: string,
+  args: string[],
+  timeoutMs: number = 45000
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(cmd, args, {
+        env: {
+          ...process.env,
+          CI: "1",
+          NO_COLOR: "1",
+        },
+      });
+
+      let stdout = "";
+      let stderr = "";
+
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGTERM");
+        } catch {}
+        resolve(null);
+      }, timeoutMs);
+
+      child.stdout?.on("data", (chunk) => {
+        stdout += chunk.toString();
+      });
+
+      child.stderr?.on("data", (chunk) => {
+        stderr += chunk.toString();
+      });
+
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        if (code === 0 && stdout.trim().length > 0) {
+          resolve(stdout.trim());
+        } else {
+          resolve(null);
+        }
+      });
+
+      child.on("error", () => {
+        clearTimeout(timer);
+        resolve(null);
+      });
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
  * Unified text generation router for VibeFlow Studio agents.
- * Evaluates available API keys and falls back gracefully.
+ * Default: Uses the logged-in Claude Pro / Gemini Pro CLIs.
+ * API keys are strictly optional fallbacks.
  */
 export async function callAI(params: AICallParams): Promise<AIResponse> {
   const {
     systemPrompt,
     userPrompt,
     modelType = "claude",
+    preferCli = true,
     temperature = 0.7,
     maxTokens = 4096,
   } = params;
 
-  // 1. Resolve Anthropic API Key
+  const combinedPrompt = `${systemPrompt}\n\n---\n\n${userPrompt}`;
+
+  // ─────────────────────────────────────────────────────────────
+  // 1. PRIORITY 1 (PAR DÉFAUT) : CLIs LOCAUX (Comptes Pro)
+  // ─────────────────────────────────────────────────────────────
+  if (preferCli) {
+    // 1.A : Claude Code CLI (Compte Claude Pro)
+    if (modelType === "claude" || modelType === "synthesis") {
+      try {
+        const cliOutput = await spawnCli("claude", [
+          "--print",
+          "-p",
+          combinedPrompt,
+        ]);
+
+        if (cliOutput && cliOutput.length > 20) {
+          console.log("[AI Provider] Successfully used Claude Code CLI (Claude Pro subscription).");
+          return {
+            content: cliOutput,
+            provider: "claude-cli",
+            modelUsed: "claude-code-pro-cli",
+          };
+        }
+      } catch (err) {
+        console.warn("[AI Provider] Claude Code CLI execution skipped:", err);
+      }
+    }
+
+    // 1.B : Antigravity CLI (Compte Google / Gemini Pro)
+    if (modelType === "antigravity" || modelType === "synthesis") {
+      try {
+        const cliOutput =
+          (await spawnCli("antigravity", ["-p", combinedPrompt])) ||
+          (await spawnCli("agy", ["-p", combinedPrompt]));
+
+        if (cliOutput && cliOutput.length > 20) {
+          console.log("[AI Provider] Successfully used Antigravity CLI (Gemini Pro subscription).");
+          return {
+            content: cliOutput,
+            provider: "antigravity-cli",
+            modelUsed: "antigravity-gemini-pro-cli",
+          };
+        }
+      } catch (err) {
+        console.warn("[AI Provider] Antigravity CLI execution skipped:", err);
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 2. PRIORITY 2 (FACULTATIF / OPTIONNEL) : Clés API si fournies
+  // ─────────────────────────────────────────────────────────────
+
+  // Optional Anthropic API Key
   const anthropicKey =
     params.anthropicApiKey ||
     process.env.ANTHROPIC_API_KEY ||
@@ -43,13 +157,8 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
   if (anthropicKey && anthropicKey.startsWith("sk-ant")) {
     try {
       const client = new Anthropic({ apiKey: anthropicKey });
-      const model =
-        modelType === "antigravity"
-          ? "claude-3-5-sonnet-20241022"
-          : "claude-3-5-sonnet-20241022";
-
       const res = await client.messages.create({
-        model,
+        model: "claude-3-5-sonnet-20241022",
         max_tokens: maxTokens,
         temperature,
         system: systemPrompt,
@@ -60,16 +169,16 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
       if (textBlock && textBlock.text) {
         return {
           content: textBlock.text,
-          provider: "anthropic",
-          modelUsed: model,
+          provider: "anthropic-api",
+          modelUsed: "claude-3-5-sonnet-api",
         };
       }
     } catch (err) {
-      console.warn("[AI Provider] Anthropic call failed, falling back:", err);
+      console.warn("[AI Provider] Anthropic API call failed, falling back:", err);
     }
   }
 
-  // 2. Resolve Google Gemini API Key
+  // Optional Google Gemini API Key
   const geminiKey =
     params.geminiApiKey ||
     process.env.GEMINI_API_KEY ||
@@ -86,9 +195,7 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
             contents: [
               {
                 role: "user",
-                parts: [
-                  { text: `${systemPrompt}\n\n---\n\n${userPrompt}` },
-                ],
+                parts: [{ text: combinedPrompt }],
               },
             ],
             generationConfig: {
@@ -106,17 +213,19 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
         if (candidateText) {
           return {
             content: candidateText,
-            provider: "gemini",
-            modelUsed: "gemini-2.0-flash",
+            provider: "gemini-api",
+            modelUsed: "gemini-2.0-flash-api",
           };
         }
       }
     } catch (err) {
-      console.warn("[AI Provider] Gemini call failed, falling back:", err);
+      console.warn("[AI Provider] Gemini API call failed, falling back:", err);
     }
   }
 
-  // 3. Realistic Heuristic Generation (Guarantees execution without external API blocker)
+  // ─────────────────────────────────────────────────────────────
+  // 3. PRIORITY 3 (RÉSILIENCE TOTALE) : Moteur Heuristique Expert
+  // ─────────────────────────────────────────────────────────────
   return {
     content: generateHeuristicResponse(systemPrompt, userPrompt, modelType),
     provider: "heuristic",
@@ -141,7 +250,7 @@ function generateHeuristicResponse(
       return JSON.stringify(
         {
           reviewer: "CLAUDE",
-          score: 8.4,
+          score: 8.5,
           strengths: [
             "Architecture moderne et ergonomique pour l'utilisateur final.",
             "Utilisation pertinente des primitives réactives et typage strict.",
@@ -167,7 +276,7 @@ function generateHeuristicResponse(
       return JSON.stringify(
         {
           reviewer: "ANTIGRAVITY",
-          score: 8.8,
+          score: 8.9,
           strengths: [
             "Structure transactionnelle d'une robustesse exemplaire.",
             "Gestion rigoureuse des erreurs d'infrastructure et edge cases.",
@@ -195,7 +304,7 @@ function generateHeuristicResponse(
   // Implementation generation
   if (isClaude) {
     return `// ============================================================
-// Implémentation Claude: Architecture Robuste & Sécurisée
+// Implémentation Claude Code (Claude Pro): Architecture Robuste
 // ============================================================
 
 import { z } from "zod";
@@ -250,7 +359,7 @@ export class TransactionEngine {
 
   if (isAntigravity) {
     return `// ============================================================
-// Implémentation Antigravity: Performance & UX Ultra-Fluide
+// Implémentation Antigravity CLI (Gemini Pro): Performance & UX
 // ============================================================
 
 import { create } from "zustand";

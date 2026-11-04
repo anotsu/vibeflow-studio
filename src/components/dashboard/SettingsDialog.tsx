@@ -1,6 +1,6 @@
 // ============================================================
 // VibeFlow Studio — Settings & Integration Testers Modal
-// Test GitHub PAT, Anthropic API Key & Coolify connection live
+// Prioritizes Pro Accounts & CLIs by default, API tokens optional
 // ============================================================
 "use client";
 
@@ -18,6 +18,10 @@ import {
   Save,
   Key,
   ShieldCheck,
+  Sparkles,
+  Terminal,
+  ExternalLink,
+  Lock,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 
@@ -26,12 +30,20 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ onClose }: SettingsDialogProps) {
-  const { addNotification } = useUIStore();
+  const { addNotification, setActiveCliTab, setCliPanelOpen } = useUIStore();
 
   const [loading, setLoading] = useState(false);
   const [testingGithub, setTestingGithub] = useState(false);
   const [testingCoolify, setTestingCoolify] = useState(false);
   const [testingClaude, setTestingClaude] = useState(false);
+
+  const [cliInfo, setCliInfo] = useState<{
+    claudeCliInstalled?: boolean;
+    antigravityCliInstalled?: boolean;
+    hasClaudeAuth?: boolean;
+    hasAgyAuth?: boolean;
+    defaultEngine?: string;
+  }>({});
 
   const [githubResult, setGithubResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [coolifyResult, setCoolifyResult] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -52,6 +64,13 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       .then((r) => r.json())
       .then((data) => {
         if (!data.error) {
+          setCliInfo({
+            claudeCliInstalled: data.claudeCliInstalled,
+            antigravityCliInstalled: data.antigravityCliInstalled,
+            hasClaudeAuth: data.hasClaudeAuth,
+            hasAgyAuth: data.hasAgyAuth,
+            defaultEngine: data.defaultEngine,
+          });
           setForm((prev) => ({
             ...prev,
             coolifyUrl: data.defaultCoolifyUrl || "",
@@ -63,6 +82,18 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       })
       .catch(console.error);
   }, []);
+
+  const openCliForAuth = (tab: "claude" | "antigravity") => {
+    setActiveCliTab(tab);
+    setCliPanelOpen(true);
+    addNotification({
+      type: "info",
+      title: tab === "claude" ? "Claude Code CLI activé" : "Antigravity CLI activé",
+      message: `Terminal ouvert. Tapez ${tab === "claude" ? "'claude login'" : "'agy login'"} pour associer votre compte.`,
+      autoDismissMs: 5000,
+    });
+    onClose();
+  };
 
   const testGithub = async () => {
     setTestingGithub(true);
@@ -126,7 +157,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       });
       const data = await res.json();
       if (data.success) {
-        setClaudeResult({ ok: true, msg: `Clé validée (${data.model})` });
+        setClaudeResult({ ok: true, msg: `Clé API validée (${data.model})` });
       } else {
         setClaudeResult({ ok: false, msg: data.error || "Invalide" });
       }
@@ -153,7 +184,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
       addNotification({
         type: "success",
         title: "Configuration sauvegardée",
-        message: "Les paramètres globaux et clés API ont été mis à jour avec chiffrement.",
+        message: "Les paramètres globaux ont été mis à jour avec succès.",
         autoDismissMs: 3500,
       });
       onClose();
@@ -170,13 +201,18 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[92vh] overflow-y-auto flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/80 sticky top-0 z-10 backdrop-blur">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/90 sticky top-0 z-10 backdrop-blur">
+          <div className="flex items-center gap-2.5">
             <Settings className="w-5 h-5 text-primary" />
-            <h2 className="text-base font-semibold">Paramètres & Intégrations</h2>
+            <div>
+              <h2 className="text-base font-semibold">Paramètres & Authentification</h2>
+              <p className="text-[11px] text-muted-foreground">
+                Configuration des moteurs IA (Comptes Pro & CLIs) et intégrations
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -188,72 +224,106 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
 
         {/* Form Body */}
         <form onSubmit={handleSave} className="p-6 space-y-6">
-          {/* Security Notice */}
-          <div className="p-3 bg-secondary/50 rounded-lg border border-border flex items-start gap-2.5 text-xs text-muted-foreground">
-            <ShieldCheck className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
-            <span>
-              Toutes les clés d&apos;API sont chiffrées au repos via <code className="text-foreground font-mono">AES-256-GCM</code> avant stockage en base de données.
-            </span>
-          </div>
-
-          {/* GitHub Integration */}
-          <div className="space-y-2">
+          {/* SECTION 1: PRO ACCOUNTS & CLI FIRST (DEFAULT) */}
+          <div className="rounded-xl border border-primary/40 bg-gradient-to-br from-primary/10 via-card to-background p-4 space-y-3.5 shadow-sm">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <GitBranch className="w-4 h-4 text-foreground" /> Token GitHub (Personal Access Token)
-              </label>
-              <button
-                type="button"
-                onClick={testGithub}
-                disabled={testingGithub}
-                className="text-[11px] text-primary hover:underline flex items-center gap-1"
-              >
-                {testingGithub && <Loader2 className="w-3 h-3 animate-spin" />} Tester connexion
-              </button>
-            </div>
-            <input
-              type="password"
-              value={form.githubToken}
-              onChange={(e) => setForm({ ...form, githubToken: e.target.value })}
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-              className="w-full bg-secondary text-foreground text-xs rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
-            />
-            {githubResult && (
-              <div
-                className={`text-[11px] flex items-center gap-1.5 ${
-                  githubResult.ok ? "text-green-400" : "text-red-400"
-                }`}
-              >
-                {githubResult.ok ? (
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                ) : (
-                  <AlertCircle className="w-3.5 h-3.5" />
-                )}
-                <span>{githubResult.msg}</span>
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">
+                  Mode Par Défaut : Comptes Pro & CLIs (0€ de frais API)
+                </h3>
               </div>
-            )}
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-primary/20 text-primary border border-primary/30 rounded-full">
+                Priorité 1 Active
+              </span>
+            </div>
+
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              VibeFlow Studio est configuré <strong>par défaut</strong> pour exécuter vos requêtes via vos abonnements existants <strong>Claude Pro</strong> (via Claude Code CLI) et <strong>Gemini Pro</strong> (via Antigravity CLI). Vous n&apos;avez <em>aucun besoin</em> d&apos;acheter de crédits API payants.
+            </p>
+
+            {/* Sub-cards for Claude Pro & Gemini Pro */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Claude Pro Box */}
+              <div className="p-3 bg-secondary/60 rounded-lg border border-border/80 flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-claude flex items-center gap-1.5">
+                      <Bot className="w-3.5 h-3.5" /> Claude Pro (CLI)
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-mono">
+                      @anthropic-ai/claude-code
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Connectez votre abonnement Pro directement en navigateur.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openCliForAuth("claude")}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-claude/20 hover:bg-claude/30 text-claude border border-claude/30 rounded text-xs font-medium transition-colors"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                  <span>Ouvrir terminal (`claude login`)</span>
+                </button>
+              </div>
+
+              {/* Gemini Pro / Antigravity Box */}
+              <div className="p-3 bg-secondary/60 rounded-lg border border-border/80 flex flex-col justify-between space-y-2.5">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-antigravity flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" /> Gemini Pro (Antigravity)
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono">
+                      agy v2.0
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Gratuit via Google AI Studio ou votre compte Gemini Pro.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openCliForAuth("antigravity")}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 rounded text-xs font-medium transition-colors"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                  <span>Ouvrir terminal (`agy login`)</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Anthropic Claude API */}
-          <div className="space-y-2">
+          {/* SECTION 2: OPTIONAL API KEYS */}
+          <div className="space-y-3 pt-1">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Bot className="w-4 h-4 text-claude" /> Clé API Anthropic (Claude)
+                <Key className="w-4 h-4 text-muted-foreground" /> Clé API Anthropic (Claude)
               </label>
-              <button
-                type="button"
-                onClick={testClaude}
-                disabled={testingClaude}
-                className="text-[11px] text-claude hover:underline flex items-center gap-1"
-              >
-                {testingClaude && <Loader2 className="w-3 h-3 animate-spin" />} Valider clé
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground px-2 py-0.5 bg-secondary rounded-full border border-border">
+                  Facultatif / Optionnel
+                </span>
+                <button
+                  type="button"
+                  onClick={testClaude}
+                  disabled={testingClaude || !form.anthropicApiKey}
+                  className="text-[11px] text-claude hover:underline flex items-center gap-1 disabled:opacity-40"
+                >
+                  {testingClaude && <Loader2 className="w-3 h-3 animate-spin" />} Tester clé
+                </button>
+              </div>
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Utilisé uniquement si vous ne souhaitez pas utiliser la CLI Claude Code ou en second recours.
+            </p>
             <input
               type="password"
               value={form.anthropicApiKey}
               onChange={(e) => setForm({ ...form, anthropicApiKey: e.target.value })}
-              placeholder="sk-ant-api03-xxxxxxxxxxxxxxxx"
+              placeholder="sk-ant-api03-xxxxxxxxxxxxxxxx (Optionnel)"
               className="w-full bg-secondary text-foreground text-xs rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
             />
             {claudeResult && (
@@ -272,8 +342,46 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
             )}
           </div>
 
-          {/* Coolify Integration */}
-          <div className="space-y-3">
+          {/* SECTION 3: GITHUB INTEGRATION */}
+          <div className="space-y-2 pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <GitBranch className="w-4 h-4 text-foreground" /> Token GitHub (Personal Access Token)
+              </label>
+              <button
+                type="button"
+                onClick={testGithub}
+                disabled={testingGithub}
+                className="text-[11px] text-primary hover:underline flex items-center gap-1"
+              >
+                {testingGithub && <Loader2 className="w-3 h-3 animate-spin" />} Tester connexion
+              </button>
+            </div>
+            <input
+              type="password"
+              value={form.githubToken}
+              onChange={(e) => setForm({ ...form, githubToken: e.target.value })}
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx (Requis pour la gestion Git & PRs)"
+              className="w-full bg-secondary text-foreground text-xs rounded-md px-3 py-2 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+            />
+            {githubResult && (
+              <div
+                className={`text-[11px] flex items-center gap-1.5 ${
+                  githubResult.ok ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {githubResult.ok ? (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5" />
+                )}
+                <span>{githubResult.msg}</span>
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 4: COOLIFY INTEGRATION */}
+          <div className="space-y-3 pt-2 border-t border-border">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Cloud className="w-4 h-4 text-blue-400" /> Instance Coolify & Token
@@ -319,7 +427,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
             )}
           </div>
 
-          {/* Auto-Mode & Workers Daemon */}
+          {/* SECTION 5: ORCHESTRATION & DAEMON */}
           <div className="pt-2 border-t border-border space-y-3">
             <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <Database className="w-4 h-4 text-primary" /> Orchestration & Daemon 24/7
@@ -356,6 +464,14 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Security Notice */}
+          <div className="p-3 bg-secondary/40 rounded-lg border border-border/80 flex items-start gap-2.5 text-xs text-muted-foreground">
+            <ShieldCheck className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+            <span>
+              Les tokens d&apos;accès et sessions sont chiffrés avec <code className="text-foreground font-mono">AES-256-GCM</code> et persistés de façon sécurisée.
+            </span>
           </div>
 
           {/* Footer Actions */}

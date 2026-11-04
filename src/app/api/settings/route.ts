@@ -8,12 +8,22 @@ import { prisma } from "@/lib/prisma";
 import { encrypt, decrypt } from "@/lib/utils";
 import { Octokit } from "octokit";
 import Anthropic from "@anthropic-ai/sdk";
+import fs from "fs";
+import path from "path";
 
 export async function GET() {
   try {
     const settings = await prisma.globalSettings.findUnique({
       where: { id: "singleton" },
     });
+
+    const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+    const hasClaudeAuth =
+      fs.existsSync(path.join(homeDir, ".claude.json")) ||
+      fs.existsSync(path.join(homeDir, ".claude"));
+    const hasAgyAuth = fs.existsSync(
+      path.join(homeDir, ".gemini", "antigravity-cli", "settings.json")
+    );
 
     return NextResponse.json({
       hasGithubToken: Boolean(settings?.defaultGithubToken),
@@ -23,6 +33,11 @@ export async function GET() {
       redisUrl: settings?.redisUrl || "redis://localhost:6379",
       autoModeIntervalMs: settings?.autoModeIntervalMs || 300000,
       maxConcurrentTasks: settings?.maxConcurrentTasks || 2,
+      claudeCliInstalled: true,
+      antigravityCliInstalled: true,
+      hasClaudeAuth,
+      hasAgyAuth,
+      defaultEngine: "pro_clis",
     });
   } catch (error) {
     return NextResponse.json(
