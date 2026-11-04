@@ -52,12 +52,7 @@ export async function GET(request: NextRequest) {
       grouped[item.status].push(item);
     }
 
-    return NextResponse.json({
-      projectId,
-      total: items.length,
-      grouped,
-      flat: items,
-    });
+    return NextResponse.json(items);
   } catch (error) {
     console.error("[GET /api/toolbox] Error:", error);
     return NextResponse.json(

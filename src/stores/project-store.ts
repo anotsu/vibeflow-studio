@@ -85,10 +85,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch("/api/projects");
       if (!res.ok) throw new Error("Failed to fetch projects");
       const data = await res.json();
-      set({ projects: data, loading: false });
+      set({ projects: Array.isArray(data) ? data : [], loading: false });
     } catch (error) {
       console.error("fetchProjects error:", error);
-      set({ loading: false });
+      set({ projects: [], loading: false });
     }
   },
 
@@ -98,7 +98,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(`/api/projects/${projectId}`);
       if (!res.ok) throw new Error("Failed to fetch project");
       const project = await res.json();
-      set({ selectedProject: project, loading: false });
+      set({
+        selectedProject: project,
+        toolboxItems: Array.isArray(project.toolboxItems) ? project.toolboxItems : [],
+        tasks: Array.isArray(project.tasks) ? project.tasks : [],
+        deployments: Array.isArray(project.deployments) ? project.deployments : [],
+        loading: false,
+      });
 
       // Fetch related data in parallel
       const state = get();
@@ -186,10 +192,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(`/api/tasks?${params}`);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
-      set({ tasks: data, tasksLoading: false });
+      set({ tasks: Array.isArray(data) ? data : [], tasksLoading: false });
     } catch (error) {
       console.error("fetchTasks error:", error);
-      set({ tasksLoading: false });
+      set({ tasks: [], tasksLoading: false });
     }
   },
 
@@ -223,9 +229,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(`/api/agents/debate/${taskId}`);
       if (!res.ok) throw new Error("Failed to fetch debate");
       const data = await res.json();
-      set({ debateLogs: data });
+      set({ debateLogs: Array.isArray(data) ? data : [] });
     } catch (error) {
       console.error("fetchTaskDebate error:", error);
+      set({ debateLogs: [] });
     }
   },
 
@@ -237,10 +244,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(`/api/toolbox?projectId=${projectId}`);
       if (!res.ok) throw new Error("Failed to fetch toolbox");
       const data = await res.json();
-      set({ toolboxItems: data, toolboxLoading: false });
+      const items = Array.isArray(data) ? data : (data.flat || []);
+      set({ toolboxItems: items, toolboxLoading: false });
     } catch (error) {
       console.error("fetchToolbox error:", error);
-      set({ toolboxLoading: false });
+      set({ toolboxItems: [], toolboxLoading: false });
     }
   },
 
@@ -264,9 +272,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(`/api/deployments?projectId=${projectId}`);
       if (!res.ok) throw new Error("Failed to fetch deployments");
       const data = await res.json();
-      set({ deployments: data });
+      set({ deployments: Array.isArray(data) ? data : [] });
     } catch (error) {
       console.error("fetchDeployments error:", error);
+      set({ deployments: [] });
     }
   },
 

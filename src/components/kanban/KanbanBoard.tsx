@@ -82,9 +82,10 @@ const ORIGIN_ICONS: Record<string, React.ReactNode> = {
 export function KanbanBoard() {
   const { tasks, selectedProject, startOrchestration } = useProjectStore();
 
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
   const getTasksForColumn = (column: KanbanColumn): TaskWithRelations[] => {
-    return tasks.filter((t) =>
-      column.statuses.includes(t.status as TaskStatus)
+    return safeTasks.filter((t) =>
+      t && column.statuses.includes(t.status as TaskStatus)
     );
   };
 

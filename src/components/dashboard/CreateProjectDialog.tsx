@@ -286,7 +286,7 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
                       Technologies & Stack détectées :
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {scannedData.detectedStack.map((tech) => (
+                      {(scannedData.detectedStack || []).map((tech) => (
                         <span
                           key={tech}
                           className="px-2 py-0.5 text-[10px] font-semibold bg-secondary rounded-full border border-border/80 text-foreground"
@@ -301,15 +301,15 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
                   <div className="grid grid-cols-3 gap-2 pt-1 border-t border-border/40 text-[11px]">
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <PackageCheck className="w-3.5 h-3.5 text-yellow-400" />
-                      <span>{scannedData.toolboxItems.length} outils (boîte)</span>
+                      <span>{(scannedData.toolboxItems || []).length} outils (boîte)</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Layers className="w-3.5 h-3.5 text-blue-400" />
-                      <span>{scannedData.milestones.length} jalons adaptés</span>
+                      <span>{(scannedData.milestones || []).length} jalons adaptés</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <ListTodo className="w-3.5 h-3.5 text-green-400" />
-                      <span>{scannedData.initialTasks.length} tâches auto</span>
+                      <span>{(scannedData.initialTasks || []).length} tâches auto</span>
                     </div>
                   </div>
                 </div>

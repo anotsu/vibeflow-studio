@@ -94,8 +94,9 @@ export function CloudCLI() {
     );
   }
 
-  const missingItems = toolboxItems.filter((i) => i.status === "MISSING");
-  const lastDeployment = deployments[0];
+  const safeToolboxItems = Array.isArray(toolboxItems) ? toolboxItems : [];
+  const missingItems = safeToolboxItems.filter((i) => i.status === "MISSING");
+  const lastDeployment = Array.isArray(deployments) ? deployments[0] : undefined;
 
   const panelClasses =
     cliPanelPosition === "bottom"

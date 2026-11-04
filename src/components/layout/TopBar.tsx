@@ -41,7 +41,9 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
   };
 
   // Derive status badges
-  const lastDeployment = selectedProject?.deployments?.[0];
+  const lastDeployment = Array.isArray(selectedProject?.deployments)
+    ? selectedProject.deployments[0]
+    : undefined;
   const coolifyStatus = lastDeployment?.status || "UNKNOWN";
   const coolifyStatusColor =
     coolifyStatus === "RUNNING"
@@ -76,7 +78,7 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
             <option value="" disabled>
               Select a project...
             </option>
-            {projects.map((p) => (
+            {(Array.isArray(projects) ? projects : []).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>

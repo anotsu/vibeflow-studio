@@ -42,8 +42,9 @@ export function DualBranchArena() {
   const [diffMode, setDiffMode] = useState<"split" | "unified">("split");
 
   // Filter tasks that have dual branches
-  const duelTasks = tasks.filter(
-    (t) => t.claudeBranch || t.antigravityBranch || t.status === "IN_DEBATE" || t.status === "SYNTHESIS"
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const duelTasks = safeTasks.filter(
+    (t) => t && (t.claudeBranch || t.antigravityBranch || t.status === "IN_DEBATE" || t.status === "SYNTHESIS")
   );
 
   const selectedTask = duelTasks.find((t) => t.id === selectedTaskId) || duelTasks[0];
@@ -56,10 +57,11 @@ export function DualBranchArena() {
   }, [selectedTask?.id, fetchTaskDebate]);
 
   // Preview deployments
-  const claudeDeployment = deployments.find(
+  const safeDeployments = Array.isArray(deployments) ? deployments : [];
+  const claudeDeployment = safeDeployments.find(
     (d) => d.branch === selectedTask?.claudeBranch
   );
-  const antigravityDeployment = deployments.find(
+  const antigravityDeployment = safeDeployments.find(
     (d) => d.branch === selectedTask?.antigravityBranch
   );
 
@@ -229,9 +231,10 @@ function DebateView({
   task: TaskWithRelations;
   logs: AgentDebateLog[];
 }) {
+  const safeLogs = Array.isArray(logs) ? logs : [];
   // Compute average scores
-  const claudeScores = logs.filter((l) => l.speaker === "CLAUDE" && l.qualityScore).map((l) => l.qualityScore!);
-  const antigravityScores = logs.filter((l) => l.speaker === "ANTIGRAVITY" && l.qualityScore).map((l) => l.qualityScore!);
+  const claudeScores = safeLogs.filter((l) => l && l.speaker === "CLAUDE" && l.qualityScore).map((l) => l.qualityScore!);
+  const antigravityScores = safeLogs.filter((l) => l && l.speaker === "ANTIGRAVITY" && l.qualityScore).map((l) => l.qualityScore!);
 
   const avgClaude = claudeScores.length
     ? (claudeScores.reduce((a, b) => a + b, 0) / claudeScores.length).toFixed(1)
@@ -320,10 +323,10 @@ function DebateView({
       {/* Inter-Agent Debate Timeline */}
       <div className="space-y-3 pt-1">
         <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <MessageSquare className="w-3.5 h-3.5 text-primary" /> Fil de Challenge Croisé ({logs.length} messages)
+          <MessageSquare className="w-3.5 h-3.5 text-primary" /> Fil de Challenge Croisé ({safeLogs.length} messages)
         </h4>
 
-        {logs.map((log) => (
+        {safeLogs.map((log) => (
           <DebateMessageCard key={log.id} log={log} />
         ))}
       </div>

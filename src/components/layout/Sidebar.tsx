@@ -80,7 +80,7 @@ export function Sidebar() {
 
   if (!sidebarOpen) return null;
 
-  const milestones = selectedProject?.milestones || [];
+  const milestones = Array.isArray(selectedProject?.milestones) ? selectedProject.milestones : [];
   const activeMilestone =
     milestones.find((m) => m.status === "IN_PROGRESS") ||
     milestones.find((m) => m.status === "PENDING") ||
@@ -338,6 +338,7 @@ export function Sidebar() {
             ) : (
               <div className="space-y-1">
                 {milestones
+                  .slice()
                   .sort((a, b) => a.order - b.order)
                   .map((milestone, index) => (
                     <div key={milestone.id} className="relative">

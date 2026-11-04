@@ -110,9 +110,10 @@ export function Toolbox() {
     }
   }, [selectedProject, fetchToolbox]);
 
-  const acquired = toolboxItems.filter((item) => item.status === "ACQUIRED");
-  const missing = toolboxItems.filter((item) => item.status === "MISSING");
-  const inProgress = toolboxItems.filter(
+  const safeItems = Array.isArray(toolboxItems) ? toolboxItems : [];
+  const acquired = safeItems.filter((item) => item.status === "ACQUIRED");
+  const missing = safeItems.filter((item) => item.status === "MISSING");
+  const inProgress = safeItems.filter(
     (item) => item.status === "IN_PROGRESS"
   );
 
