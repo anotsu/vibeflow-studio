@@ -74,6 +74,7 @@ export function CloudCLI() {
     setActiveCliTab,
     toggleCliPanel,
     setCliPanelPosition,
+    addNotification,
   } = useUIStore();
 
   const { selectedProject, toolboxItems, deployments } = useProjectStore();
@@ -219,6 +220,37 @@ export function CloudCLI() {
           </div>
         </div>
       )}
+
+      {/* Quick Action Commands Bar */}
+      <div className="flex items-center gap-1.5 px-3 py-1 bg-black/40 border-b border-border/30 text-[11px] overflow-x-auto select-none">
+        <span className="text-[10px] text-zinc-500 font-mono shrink-0 uppercase tracking-wider font-semibold">
+          Actions rapides :
+        </span>
+        {[
+          { label: "⚡ Statut CLIs Pro", cmd: "agy -p 'ping' && claude --version" },
+          { label: "📊 Git status", cmd: "git status" },
+          { label: "📦 Dépendances", cmd: "npm list --depth=0" },
+          { label: "🧪 Tests unitaires", cmd: "npm test" },
+          { label: "🚀 Santé Coolify", cmd: "curl -sI https://vibeflow.capstation.fr" },
+        ].map((action, idx) => (
+          <button
+            key={idx}
+            onClick={() => {
+              navigator.clipboard.writeText(action.cmd);
+              addNotification({
+                type: "info",
+                title: "Commande copiée",
+                message: `Collez dans le terminal: ${action.cmd}`,
+                autoDismissMs: 2500,
+              });
+            }}
+            className="px-2 py-0.5 rounded bg-zinc-800/60 hover:bg-zinc-700/80 text-zinc-300 hover:text-white border border-zinc-700/40 text-[10px] font-mono transition-colors shrink-0 flex items-center gap-1"
+            title={`Copier dans le presse-papier: ${action.cmd}`}
+          >
+            <span>{action.label}</span>
+          </button>
+        ))}
+      </div>
 
       {/* Real xterm.js Terminal Container */}
       <div className="flex-1 w-full h-full overflow-hidden">

@@ -32,7 +32,7 @@ interface ChatBubble {
 
 export function Sidebar() {
   const { selectedProject, selectProject } = useProjectStore();
-  const { sidebarOpen, addNotification } = useUIStore();
+  const { sidebarOpen, addNotification, setActiveWorkspaceTab } = useUIStore();
   const [activeTab, setActiveTab] = useState<"chat" | "roadmap">("chat");
   const [chatMessages, setChatMessages] = useState<ChatBubble[]>([
     {
@@ -271,6 +271,13 @@ export function Sidebar() {
 
             {/* Quick Action Chips */}
             <div className="px-3 py-1.5 border-t border-border/60 bg-card/40 flex items-center gap-1.5 overflow-x-auto">
+              <button
+                onClick={() => setActiveWorkspaceTab("arena")}
+                className="text-[10px] bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-2 py-1 rounded-md shrink-0 transition-colors flex items-center gap-1 font-semibold"
+                title="Ouvrir l'Arène de duel multi-agents"
+              >
+                <span>⚔️ Arène Duel</span>
+              </button>
               <button
                 onClick={handleRescanGithub}
                 disabled={isRescanning}

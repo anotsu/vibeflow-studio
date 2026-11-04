@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { broadcastVibeEvent } from "@/lib/event-bus";
+import { enqueueDeployment } from "@/lib/queue";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -201,6 +203,85 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     console.error("[PATCH /api/tasks/[id]] Error:", error);
     return NextResponse.json(
       { error: "Failed to update task" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST /api/tasks/[id]
+ * Action dispatcher (e.g. merge synthesis, retry duel, etc.)
+ */
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    const { action } = await request.json();
+
+    const task = await prisma.task.findUnique({
+      where: { id },
+      include: { project: true },
+    });
+
+    if (!task) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    if (action === "merge") {
+      // 1. Mark task as COMPLETED
+      const updated = await prisma.task.update({
+        where: { id },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+        },
+      });
+
+      // 2. Add celebratory debate log
+      await prisma.agentDebateLog.create({
+        data: {
+          taskId: id,
+          speaker: "SYSTEM",
+          phase: "synthesis",
+          round: 3,
+          qualityScore: 10,
+          message: `🚀 Synthèse consensuelle validée par le développeur. Fusion actée sur la branche principale '${task.project.githubDefaultBranch}'.`,
+        },
+      });
+
+      // 3. Broadcast phase change
+      broadcastVibeEvent(
+        "PHASE_CHANGED",
+        task.projectId,
+        { taskId: id, status: "COMPLETED", message: "Task merged successfully" },
+        id
+      );
+
+      // 4. If Coolify is connected, optionally trigger auto-deploy
+      if (task.project.coolifyServerUrl && task.project.coolifyAppUuid) {
+        try {
+          await enqueueDeployment({
+            projectId: task.projectId,
+            branch: task.project.githubDefaultBranch,
+            environment: "PRODUCTION",
+            taskId: id,
+          });
+        } catch (err) {
+          console.warn("[Merge Action] Auto-deploy enqueue failed:", err);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Task merged & marked as COMPLETED",
+        task: updated,
+      });
+    }
+
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  } catch (error) {
+    console.error("[POST /api/tasks/[id]] Error:", error);
+    return NextResponse.json(
+      { error: "Failed to process task action" },
       { status: 500 }
     );
   }

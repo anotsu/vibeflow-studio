@@ -23,6 +23,8 @@ import {
   Split,
   FileDiff,
   Layers,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -39,7 +41,8 @@ export function DualBranchArena() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ArenaView>("debate");
   const [isSimulating, setIsSimulating] = useState(false);
-  const [diffMode, setDiffMode] = useState<"split" | "unified">("split");
+  const [isMerging, setIsMerging] = useState(false);
+  const [diffMode, setDiffMode] = useState<"split" | "unified" | "synthesis">("split");
 
   // Filter tasks that have dual branches or candidate tasks
   const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -66,6 +69,38 @@ export function DualBranchArena() {
   const antigravityDeployment = safeDeployments.find(
     (d) => d.branch === selectedTask?.antigravityBranch
   );
+
+  // Trigger task merge & completion
+  const handleMergeTask = async (taskId: string) => {
+    if (!selectedProject) return;
+    setIsMerging(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "merge" }),
+      });
+      if (!res.ok) throw new Error("Erreur lors de la validation et fusion");
+      const data = await res.json();
+      addNotification({
+        type: "success",
+        title: "Synthèse Fusionnée !",
+        message: "La tâche est validée et fusionnée dans la branche principale.",
+        autoDismissMs: 4000,
+      });
+      await fetchTasks(selectedProject.id);
+      await fetchTaskDebate(taskId);
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur fusion",
+        message: err.message,
+        autoDismissMs: 4000,
+      });
+    } finally {
+      setIsMerging(false);
+    }
+  };
 
   // Trigger live simulation
   const handleRunSimulation = async () => {
@@ -208,12 +243,19 @@ export function DualBranchArena() {
         </div>
       ) : (
         <div className="flex-1 overflow-hidden flex flex-col">
-          {activeView === "debate" && <DebateView task={selectedTask} logs={debateLogs} />}
+          {activeView === "debate" && (
+            <DebateView
+              task={selectedTask}
+              logs={debateLogs}
+              onMergeTask={handleMergeTask}
+              isMerging={isMerging}
+            />
+          )}
           {activeView === "diff" && (
             <DiffView
               task={selectedTask}
               diffMode={diffMode}
-              onToggleMode={() => setDiffMode(diffMode === "split" ? "unified" : "split")}
+              onChangeMode={(mode) => setDiffMode(mode)}
             />
           )}
           {activeView === "preview" && (
@@ -233,10 +275,15 @@ export function DualBranchArena() {
 function DebateView({
   task,
   logs,
+  onMergeTask,
+  isMerging,
 }: {
   task: TaskWithRelations;
   logs: AgentDebateLog[];
+  onMergeTask?: (taskId: string) => void;
+  isMerging?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
   const safeLogs = Array.isArray(logs) ? logs : [];
   // Compute average scores
   const claudeScores = safeLogs.filter((l) => l && l.speaker === "CLAUDE" && l.qualityScore).map((l) => l.qualityScore!);
@@ -259,9 +306,16 @@ function DebateView({
             <h3 className="text-sm font-semibold text-foreground">{task.title}</h3>
             <p className="text-xs text-muted-foreground">{task.description}</p>
           </div>
-          <span className="text-[10px] font-mono bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-semibold">
-            Status: {task.status}
-          </span>
+          <div className="flex items-center gap-2">
+            {task.status === "COMPLETED" && (
+              <span className="text-[10px] font-mono bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Fusionné
+              </span>
+            )}
+            <span className="text-[10px] font-mono bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-semibold">
+              Status: {task.status}
+            </span>
+          </div>
         </div>
 
         {/* Versus Matchup Bar */}
@@ -308,21 +362,61 @@ function DebateView({
 
       {/* Synthesis Decision Banner */}
       {task.synthesisDecision && (
-        <div className="bg-synthesis/10 border-2 border-synthesis/40 rounded-xl p-4 shadow-sm animate-in fade-in">
-          <div className="flex items-center justify-between mb-2">
+        <div className="bg-synthesis/10 border-2 border-synthesis/40 rounded-xl p-4 shadow-sm animate-in fade-in space-y-3">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-synthesis" />
               <span className="text-xs font-bold uppercase tracking-wide text-synthesis">
-                Synthèse Consensuelle &amp; Fusion Validée
+                Synthèse Consensuelle & Fusion
               </span>
             </div>
-            <span className="text-[11px] font-mono text-synthesis bg-synthesis/20 px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold">
-              <GitMerge className="w-3 h-3" /> {task.synthesisBranch || "synthesis/ready"}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(task.synthesisDecision || "");
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="flex items-center gap-1 px-2 py-1 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground rounded text-[11px] font-medium transition-colors"
+                title="Copier la décision de synthèse"
+              >
+                {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copied ? "Copié !" : "Copier"}</span>
+              </button>
+
+              <span className="text-[11px] font-mono text-synthesis bg-synthesis/20 px-2 py-0.5 rounded-full flex items-center gap-1 font-semibold">
+                <GitMerge className="w-3 h-3" /> {task.synthesisBranch || "synthesis/ready"}
+              </span>
+            </div>
           </div>
-          <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+
+          <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed bg-black/20 p-3 rounded-lg border border-border/40 font-sans">
             {task.synthesisDecision}
           </p>
+
+          {/* Action Row */}
+          <div className="flex items-center justify-between pt-1 border-t border-border/30">
+            <span className="text-[11px] text-muted-foreground">
+              {task.status === "COMPLETED"
+                ? "✨ Cette solution a été fusionnée et validée pour la branche principale."
+                : "💡 Vérifiez la décision ci-dessus avant de fusionner dans la branche principale."}
+            </span>
+
+            {task.status !== "COMPLETED" && onMergeTask && (
+              <button
+                onClick={() => onMergeTask(task.id)}
+                disabled={isMerging}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg text-xs font-semibold transition-all shadow-md disabled:opacity-50"
+              >
+                {isMerging ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <GitMerge className="w-3.5 h-3.5" />
+                )}
+                <span>Valider & Fusionner dans main</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -405,14 +499,17 @@ function DebateMessageCard({ log }: { log: AgentDebateLog }) {
 function DiffView({
   task,
   diffMode,
-  onToggleMode,
+  onChangeMode,
 }: {
   task: TaskWithRelations;
-  diffMode: "split" | "unified";
-  onToggleMode: () => void;
+  diffMode: "split" | "unified" | "synthesis";
+  onChangeMode: (mode: "split" | "unified" | "synthesis") => void;
 }) {
-  const claudeLines = (task.claudeImplementation || "// Aucun code généré").split("\n");
-  const antigravityLines = (task.antigravityImplementation || "// Aucun code généré").split("\n");
+  const [copied, setCopied] = useState(false);
+  const claudeLines = (task.claudeImplementation || "// Aucun code généré pour Claude").split("\n");
+  const antigravityLines = (task.antigravityImplementation || "// Aucun code généré pour Antigravity").split("\n");
+  const synthesisContent = task.synthesisDecision || "// En attente de la décision de synthèse...";
+  const synthesisLines = synthesisContent.split("\n");
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -420,77 +517,129 @@ function DiffView({
       <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card/60 text-xs">
         <div className="flex items-center gap-3">
           <span className="font-semibold text-foreground flex items-center gap-1.5">
-            <FileDiff className="w-3.5 h-3.5 text-primary" /> Comparateur de Diffs Git
+            <FileDiff className="w-3.5 h-3.5 text-primary" /> Comparateur & Synthèse de Code
           </span>
-          <span className="text-green-400 font-mono text-[11px]">+48 lignes</span>
-          <span className="text-red-400 font-mono text-[11px]">-12 lignes</span>
+          <span className="text-green-400 font-mono text-[11px]">+{claudeLines.length + antigravityLines.length} lignes générées</span>
         </div>
 
-        <button
-          onClick={onToggleMode}
-          className="flex items-center gap-1 px-2 py-1 rounded bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-[11px] font-mono"
-        >
-          <Split className="w-3 h-3" />
-          Vue: {diffMode === "split" ? "Côte à côte" : "Unifiée"}
-        </button>
+        {/* View Mode Switcher */}
+        <div className="flex items-center bg-secondary rounded-md p-0.5 border border-border/50 text-[11px]">
+          <button
+            onClick={() => onChangeMode("split")}
+            className={`px-2.5 py-0.5 rounded transition-colors ${
+              diffMode === "split" ? "bg-card text-foreground font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Côte à côte
+          </button>
+          <button
+            onClick={() => onChangeMode("unified")}
+            className={`px-2.5 py-0.5 rounded transition-colors ${
+              diffMode === "unified" ? "bg-card text-foreground font-semibold shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Vue unifiée
+          </button>
+          <button
+            onClick={() => onChangeMode("synthesis")}
+            className={`px-2.5 py-0.5 rounded transition-colors flex items-center gap-1 ${
+              diffMode === "synthesis" ? "bg-synthesis/20 text-synthesis font-semibold shadow-sm" : "text-muted-foreground hover:text-synthesis"
+            }`}
+          >
+            <Trophy className="w-3 h-3 text-synthesis" />
+            <span>Synthèse Finale</span>
+          </button>
+        </div>
       </div>
 
       {/* Code Container */}
-      <div className="flex-1 overflow-hidden flex">
-        {/* Claude Code Panel */}
-        <div className="flex-1 border-r border-border flex flex-col overflow-hidden">
-          <div className="px-3 py-1.5 bg-claude-muted/30 border-b border-border flex items-center justify-between text-xs font-mono">
-            <span className="text-claude font-bold flex items-center gap-1.5">
-              <Bot className="w-3.5 h-3.5" /> {task.claudeBranch || "agent/claude"}
-            </span>
-            <span className="text-[10px] text-muted-foreground">{claudeLines.length} lignes</span>
+      {diffMode === "synthesis" ? (
+        <div className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
+          <div className="px-4 py-2 bg-synthesis/10 border-b border-border/60 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-synthesis" />
+              <span className="text-synthesis font-bold font-mono">
+                {task.synthesisBranch || "synthesis/solution"} — Décision & Solution Consensuelle
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(synthesisContent);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="flex items-center gap-1 px-2.5 py-1 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground rounded text-[11px] font-medium transition-colors"
+            >
+              {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+              <span>{copied ? "Copié !" : "Copier la solution"}</span>
+            </button>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-5 bg-[#09090b]">
-            {claudeLines.map((line, idx) => {
-              const isAdded = line.includes("import") || line.includes("export") || line.includes("verify");
-              return (
-                <div
-                  key={idx}
-                  className={`flex items-start px-2 py-0.5 rounded ${
-                    isAdded ? "bg-green-500/10 text-green-300" : "text-zinc-300"
-                  }`}
-                >
-                  <span className="w-8 shrink-0 text-zinc-600 select-none text-[10px]">{idx + 1}</span>
-                  <span className="whitespace-pre">{line}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Antigravity Code Panel */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-3 py-1.5 bg-antigravity-muted/30 border-b border-border flex items-center justify-between text-xs font-mono">
-            <span className="text-antigravity font-bold flex items-center gap-1.5">
-              <Rocket className="w-3.5 h-3.5" /> {task.antigravityBranch || "agent/antigravity"}
-            </span>
-            <span className="text-[10px] text-muted-foreground">{antigravityLines.length} lignes</span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-5 bg-[#09090b]">
-            {antigravityLines.map((line, idx) => {
-              const isAdded = line.includes("immer") || line.includes("haptic") || line.includes("triggerQuickBuy");
-              return (
-                <div
-                  key={idx}
-                  className={`flex items-start px-2 py-0.5 rounded ${
-                    isAdded ? "bg-blue-500/10 text-blue-300" : "text-zinc-300"
-                  }`}
-                >
-                  <span className="w-8 shrink-0 text-zinc-600 select-none text-[10px]">{idx + 1}</span>
-                  <span className="whitespace-pre">{line}</span>
-                </div>
-              );
-            })}
+          <div className="flex-1 overflow-y-auto p-4 font-mono text-[11px] leading-5 text-zinc-200">
+            {synthesisLines.map((line, idx) => (
+              <div key={idx} className="flex items-start hover:bg-white/[0.02] px-2 py-0.5 rounded">
+                <span className="w-10 shrink-0 text-zinc-600 select-none text-[10px]">{idx + 1}</span>
+                <span className="whitespace-pre font-sans text-xs text-zinc-300">{line}</span>
+              </div>
+            ))}
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 overflow-hidden flex">
+          {/* Claude Code Panel */}
+          <div className="flex-1 border-r border-border flex flex-col overflow-hidden">
+            <div className="px-3 py-1.5 bg-claude-muted/30 border-b border-border flex items-center justify-between text-xs font-mono">
+              <span className="text-claude font-bold flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5" /> {task.claudeBranch || "agent/claude"}
+              </span>
+              <span className="text-[10px] text-muted-foreground">{claudeLines.length} lignes</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-5 bg-[#09090b]">
+              {claudeLines.map((line, idx) => {
+                const isAdded = line.includes("import") || line.includes("export") || line.includes("verify");
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-start px-2 py-0.5 rounded ${
+                      isAdded ? "bg-green-500/10 text-green-300" : "text-zinc-300"
+                    }`}
+                  >
+                    <span className="w-8 shrink-0 text-zinc-600 select-none text-[10px]">{idx + 1}</span>
+                    <span className="whitespace-pre">{line}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Antigravity Code Panel */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-3 py-1.5 bg-antigravity-muted/30 border-b border-border flex items-center justify-between text-xs font-mono">
+              <span className="text-antigravity font-bold flex items-center gap-1.5">
+                <Rocket className="w-3.5 h-3.5" /> {task.antigravityBranch || "agent/antigravity"}
+              </span>
+              <span className="text-[10px] text-muted-foreground">{antigravityLines.length} lignes</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-5 bg-[#09090b]">
+              {antigravityLines.map((line, idx) => {
+                const isAdded = line.includes("immer") || line.includes("haptic") || line.includes("triggerQuickBuy");
+                return (
+                  <div
+                    key={idx}
+                    className={`flex items-start px-2 py-0.5 rounded ${
+                      isAdded ? "bg-blue-500/10 text-blue-300" : "text-zinc-300"
+                    }`}
+                  >
+                    <span className="w-8 shrink-0 text-zinc-600 select-none text-[10px]">{idx + 1}</span>
+                    <span className="whitespace-pre">{line}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 // ============================================================
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   GitBranch,
   Cloud,
@@ -15,6 +15,8 @@ import {
   RefreshCw,
   ExternalLink,
   CircleDot,
+  Play,
+  Loader2,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -26,7 +28,8 @@ interface TopBarProps {
 export function TopBar({ onOpenSettings }: TopBarProps) {
   const { projects, selectedProject, toggleMode, fetchProjects } =
     useProjectStore();
-  const { setSelectedProjectId, notifications } = useUIStore();
+  const { setSelectedProjectId, notifications, addNotification } = useUIStore();
+  const [isTicking, setIsTicking] = useState(false);
 
   const isAuto = selectedProject?.mode === "AUTO";
 
@@ -37,6 +40,35 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
   const handleModeToggle = () => {
     if (selectedProject) {
       toggleMode(selectedProject.id);
+    }
+  };
+
+  const handleTriggerDaemon = async () => {
+    if (!selectedProject) return;
+    setIsTicking(true);
+    try {
+      const res = await fetch("/api/daemon/tick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: selectedProject.id }),
+      });
+      const data = await res.json();
+      addNotification({
+        type: "success",
+        title: "Cycle Autonome Exécuté",
+        message: data.message || "Tâches et optimisations analysées par les agents.",
+        autoDismissMs: 3500,
+      });
+      await fetchProjects();
+    } catch {
+      addNotification({
+        type: "error",
+        title: "Erreur Daemon",
+        message: "Impossible de déclencher le cycle autonome.",
+        autoDismissMs: 3000,
+      });
+    } finally {
+      setIsTicking(false);
     }
   };
 
@@ -139,30 +171,44 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
       <div className="flex items-center gap-3">
         {/* Mode Toggle */}
         {selectedProject && (
-          <button
-            onClick={handleModeToggle}
-            className={`
-              flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300
-              ${
-                isAuto
-                  ? "bg-primary/20 text-primary border border-primary/30 mode-toggle-auto"
-                  : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
-              }
-            `}
-          >
-            {isAuto ? (
-              <>
-                <CircleDot className="w-3 h-3 animate-pulse" />
-                <span>Mode Auto 24/7</span>
-                <Zap className="w-3 h-3" />
-              </>
-            ) : (
-              <>
-                <Handshake className="w-3 h-3" />
-                <span>Mode Accompagné</span>
-              </>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleModeToggle}
+              className={`
+                flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300
+                ${
+                  isAuto
+                    ? "bg-primary/20 text-primary border border-primary/30 mode-toggle-auto"
+                    : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
+                }
+              `}
+            >
+              {isAuto ? (
+                <>
+                  <CircleDot className="w-3 h-3 animate-pulse" />
+                  <span>Mode Auto 24/7</span>
+                  <Zap className="w-3 h-3" />
+                </>
+              ) : (
+                <>
+                  <Handshake className="w-3 h-3" />
+                  <span>Mode Accompagné</span>
+                </>
+              )}
+            </button>
+
+            {isAuto && (
+              <button
+                onClick={handleTriggerDaemon}
+                disabled={isTicking}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-all disabled:opacity-50"
+                title="Déclencher manuellement un cycle d'optimisation autonome"
+              >
+                {isTicking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                <span className="hidden sm:inline">Exécuter Cycle</span>
+              </button>
             )}
-          </button>
+          </div>
         )}
 
         {/* Notifications */}
