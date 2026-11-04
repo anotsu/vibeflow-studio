@@ -3,11 +3,12 @@
 // State machine managing the "Dual-Branch Cross-Pollination" cycle.
 // ============================================================
 
-import Anthropic from "@anthropic-ai/sdk";
+import { callAI } from "@/lib/ai-provider";
 import { prisma } from "@/lib/prisma";
 import { createGitHubService, GitHubService } from "@/lib/github";
 import { createCoolifyService, CoolifyService } from "@/lib/coolify";
 import { decrypt } from "@/lib/utils";
+import { broadcastVibeEvent } from "@/lib/event-bus";
 import type {
   OrchestratorPhase,
   OrchestratorState,
@@ -63,7 +64,7 @@ export class DualAgentOrchestrator {
   private task: Task | null = null;
   private github: GitHubService | null = null;
   private coolify: CoolifyService | null = null;
-  private anthropic: Anthropic | null = null;
+  private anthropicKey: string | null = null;
   private defaultBranch: string = "main";
 
   private state: OrchestratorState;
@@ -123,24 +124,36 @@ export class DualAgentOrchestrator {
     }
     this.task = task;
 
-    // Validate required tokens
-    if (!project.githubToken) {
-      throw new Error(
-        `Orchestrator.initialize: Project "${project.name}" has no GitHub token configured`
-      );
-    }
-    if (!project.anthropicApiKey) {
-      throw new Error(
-        `Orchestrator.initialize: Project "${project.name}" has no Anthropic API key configured`
-      );
+    // Resolve GitHub token with fallback to environment
+    let decryptedGithubToken: string | null = null;
+    if (project.githubToken) {
+      try {
+        decryptedGithubToken = decrypt(project.githubToken);
+      } catch {
+        decryptedGithubToken = project.githubToken;
+      }
+    } else if (process.env.GITHUB_TOKEN) {
+      decryptedGithubToken = process.env.GITHUB_TOKEN;
     }
 
-    // Decrypt tokens and instantiate services
-    const decryptedGithubToken = decrypt(project.githubToken);
-    const decryptedAnthropicKey = decrypt(project.anthropicApiKey);
+    if (!decryptedGithubToken) {
+      throw new Error(
+        `Orchestrator.initialize: No GitHub token available for project "${project.name}" (set in project or GITHUB_TOKEN env)`
+      );
+    }
 
     this.github = createGitHubService(project.githubRepo, decryptedGithubToken);
-    this.anthropic = new Anthropic({ apiKey: decryptedAnthropicKey });
+
+    // Resolve Anthropic / AI Key with fallback to environment
+    if (project.anthropicApiKey) {
+      try {
+        this.anthropicKey = decrypt(project.anthropicApiKey);
+      } catch {
+        this.anthropicKey = project.anthropicApiKey;
+      }
+    } else if (process.env.ANTHROPIC_API_KEY) {
+      this.anthropicKey = process.env.ANTHROPIC_API_KEY;
+    }
 
     // Coolify is optional — only initialize if configured
     if (project.coolifyServerUrl && project.coolifyApiToken) {
@@ -740,50 +753,27 @@ Please produce the final synthesized implementation plan. For each file, specify
   // ─────────────────────────────────────────────────────────
 
   /**
-   * Call the Anthropic Claude API.
-   *
-   * @param systemPrompt - System-level instructions for Claude.
-   * @param userMessage - The user-level message/prompt.
-   * @param persona - Optional persona tag to prepend to the system prompt.
-   * @returns The text content of Claude's response.
+   * Call the unified AI router with persona and system instructions.
    */
   private async callClaude(
     systemPrompt: string,
     userMessage: string,
-    persona?: string
+    persona?: string,
+    modelType: "claude" | "antigravity" | "synthesis" = "claude"
   ): Promise<string> {
-    if (!this.anthropic) {
-      throw new Error("Anthropic client not initialized. Call initialize() first.");
-    }
-
     const finalSystemPrompt = persona
       ? `[Persona: ${persona}]\n\n${systemPrompt}`
       : systemPrompt;
 
-    const response = await this.anthropic.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: MAX_TOKENS,
-      system: finalSystemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: userMessage,
-        },
-      ],
+    const res = await callAI({
+      systemPrompt: finalSystemPrompt,
+      userPrompt: userMessage,
+      modelType,
+      anthropicApiKey: this.anthropicKey,
+      maxTokens: MAX_TOKENS,
     });
 
-    // Extract text blocks from the response
-    const textBlocks = response.content.filter(
-      (block) => block.type === "text"
-    );
-
-    if (textBlocks.length === 0) {
-      throw new Error(
-        "Claude API returned no text content in the response."
-      );
-    }
-
-    return textBlocks.map((block) => block.text).join("\n\n");
+    return res.content;
   }
 
   /**
@@ -1080,11 +1070,25 @@ ${synthesisSummary.slice(0, 5000)}${synthesisSummary.length > 5000 ? "\n\n... (t
   }
 
   /**
-   * Update the phase on the internal state and log the transition.
+   * Update the phase on the internal state, broadcast SSE event and log the transition.
    */
   private async setPhase(phase: OrchestratorPhase): Promise<void> {
     const previousPhase = this.state.phase;
     this.state.phase = phase;
+
+    broadcastVibeEvent(
+      "PHASE_CHANGED",
+      this.projectId,
+      {
+        previousPhase,
+        phase,
+        round: this.state.currentRound,
+        claudeBranch: this.state.claudeBranch,
+        antigravityBranch: this.state.antigravityBranch,
+        synthesisBranch: this.state.synthesisBranch,
+      },
+      this.taskId
+    );
 
     await this.logDebate(
       "SYSTEM",
@@ -1098,7 +1102,7 @@ ${synthesisSummary.slice(0, 5000)}${synthesisSummary.length > 5000 ? "\n\n... (t
    * Assert that the orchestrator has been initialized. Throws if not.
    */
   private assertInitialized(): void {
-    if (!this.project || !this.task || !this.github || !this.anthropic) {
+    if (!this.project || !this.task || !this.github) {
       throw new Error(
         "Orchestrator not initialized. Call initialize() before running the cycle."
       );

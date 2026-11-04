@@ -177,10 +177,21 @@ export async function enqueueTaskOrchestration(
     }
   }
 
-  // Fallback in-memory dispatch
+  // Fallback in-memory dispatch — immediately triggers async background execution
   const id = `local-orch-${Date.now()}`;
   inMemoryJobs.set(id, { id, name: data.action, data });
-  console.log(`[Queue:InMemory] Enqueued task orchestration: ${data.action} for task ${data.taskId}`);
+  console.log(`[Queue:InMemory] Enqueued & executing task orchestration: ${data.action} for task ${data.taskId}`);
+
+  // Dynamic import / call to avoid circular dependency
+  setTimeout(async () => {
+    try {
+      const { executeTaskOrchestration } = await import("@/lib/worker");
+      await executeTaskOrchestration(data);
+    } catch (err) {
+      console.error("[Queue:InMemory Execution Error]", err);
+    }
+  }, 100);
+
   return createMockJob(id, data.action, data);
 }
 

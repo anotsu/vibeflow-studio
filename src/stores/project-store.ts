@@ -165,6 +165,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!project) return;
     const newMode = project.mode === "ASSISTED" ? "AUTO" : "ASSISTED";
     await state.updateProject(projectId, { mode: newMode });
+
+    // When enabling AUTO mode, trigger an immediate daemon tick
+    if (newMode === "AUTO") {
+      fetch("/api/daemon/tick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      }).catch((err) => console.warn("[Daemon Tick Trigger Error]", err));
+    }
   },
 
   // ── Tasks ───────────────────────────────────────────────
