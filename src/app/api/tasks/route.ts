@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { TaskStatus } from "@prisma/client";
+import { syncTaskToObsidian } from "@/lib/obsidian-sync";
 
 /**
  * GET /api/tasks
@@ -198,6 +199,11 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Auto-sync newly created task to Obsidian vault asynchronously
+    syncTaskToObsidian(task.id).catch((err) =>
+      console.warn(`[POST /api/tasks] Obsidian sync failed for task ${task.id}:`, err?.message)
+    );
 
     return NextResponse.json(task, { status: 201 });
   } catch (error) {

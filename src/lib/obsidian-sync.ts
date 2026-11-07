@@ -399,32 +399,49 @@ ${(data.errorLogs || "Aucun log fourni").slice(0, 1500)}
 }
 
 /**
- * Uploads all core architecture notes from disk to the live Obsidian API in pure UTF-8.
+ * Uploads all core architecture notes and vault subfolders from disk to the live Obsidian API in pure UTF-8.
  */
-export async function syncCoreVaultDocuments(): Promise<boolean> {
+export async function syncAllVaultFilesFromDisk(): Promise<{ syncedFiles: string[]; success: boolean }> {
   const vibeFlowDir = getVibeFlowVaultDir();
-
-  const coreFiles = [
-    "00_Cockpit_VibeFlow.md",
-    "01_Master_Roadmap.md",
-    "02_Architecture_Systeme.md",
-  ];
-
+  const syncedFiles: string[] = [];
   let allSuccess = true;
-  for (const fileName of coreFiles) {
-    const diskPath = path.join(vibeFlowDir, fileName);
-    if (fs.existsSync(diskPath)) {
-      const content = fs.readFileSync(diskPath, "utf-8");
-      const ok = await pushToLiveObsidianApi(`VibeFlow/${fileName}`, content);
-      if (!ok) allSuccess = false;
+
+  function scanDir(dir: string, relPrefix: string = "") {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relPath = relPrefix ? `${relPrefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        scanDir(fullPath, relPath);
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        syncedFiles.push(relPath);
+      }
     }
   }
 
-  // Also clean up any accidental old files in root if they exist
+  scanDir(vibeFlowDir);
+
+  for (const rel of syncedFiles) {
+    const fullPath = path.join(vibeFlowDir, rel);
+    const content = fs.readFileSync(fullPath, "utf-8");
+    const ok = await pushToLiveObsidianApi(`VibeFlow/${rel}`, content);
+    if (!ok) allSuccess = false;
+  }
+
+  // Clean up any accidental legacy files in vault root
   await deleteFromLiveObsidianApi("00_Dashboard_Home.md");
   await deleteFromLiveObsidianApi("01_Master_Roadmap.md");
 
-  return allSuccess;
+  return { syncedFiles, success: allSuccess };
+}
+
+/**
+ * Uploads all core architecture notes from disk to the live Obsidian API in pure UTF-8.
+ */
+export async function syncCoreVaultDocuments(): Promise<boolean> {
+  const res = await syncAllVaultFilesFromDisk();
+  return res.success;
 }
 
 /**
@@ -435,6 +452,7 @@ export async function getObsidianVaultHealth(): Promise<{
   tasksCount: number;
   debatesCount: number;
   healingReportsCount: number;
+  blueprintsCount: number;
   liveApiOnline: boolean;
   liveApiUrl: string;
 }> {
@@ -442,10 +460,12 @@ export async function getObsidianVaultHealth(): Promise<{
   const tasksDir = path.join(vibeFlowDir, "03_Kanban_Tasks");
   const debatesDir = path.join(vibeFlowDir, "04_AI_Debates_Logs");
   const healingDir = path.join(vibeFlowDir, "05_Self_Healing_Reports");
+  const blueprintsDir = path.join(vibeFlowDir, "06_Project_Blueprints");
 
   const tasksCount = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir).filter((f) => f.endsWith(".md")).length : 0;
   const debatesCount = fs.existsSync(debatesDir) ? fs.readdirSync(debatesDir).filter((f) => f.endsWith(".md")).length : 0;
   const healingReportsCount = fs.existsSync(healingDir) ? fs.readdirSync(healingDir).filter((f) => f.endsWith(".md")).length : 0;
+  const blueprintsCount = fs.existsSync(blueprintsDir) ? fs.readdirSync(blueprintsDir).filter((f) => f.endsWith(".md")).length : 0;
 
   let liveApiOnline = false;
   try {
@@ -462,6 +482,7 @@ export async function getObsidianVaultHealth(): Promise<{
     tasksCount,
     debatesCount,
     healingReportsCount,
+    blueprintsCount,
     liveApiOnline,
     liveApiUrl: OBSIDIAN_DEFAULT_URL,
   };

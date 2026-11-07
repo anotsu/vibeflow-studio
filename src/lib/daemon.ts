@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { enqueueTaskOrchestration } from "@/lib/queue";
 import { broadcastVibeEvent } from "@/lib/event-bus";
 import { callAI } from "@/lib/ai-provider";
+import { syncTaskToObsidian } from "@/lib/obsidian-sync";
 
 export interface DaemonTickResult {
   projectsChecked: number;
@@ -150,6 +151,11 @@ Répondez UNIQUEMENT sous forme de JSON valide :
       });
 
       generatedTaskIds.push(newTask.id);
+
+      // Auto-sync autonomous task to Obsidian
+      syncTaskToObsidian(newTask.id).catch((syncErr) =>
+        console.warn(`[Daemon 24/7] Obsidian sync failed for task ${newTask.id}:`, syncErr?.message)
+      );
 
       console.log(
         `[Daemon 24/7] Created autonomous task: "${newTask.title}" (${newTask.id}). Starting dual-branch cycle...`

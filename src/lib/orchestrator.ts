@@ -9,6 +9,7 @@ import { createGitHubService, GitHubService } from "@/lib/github";
 import { createCoolifyService, CoolifyService } from "@/lib/coolify";
 import { decrypt } from "@/lib/utils";
 import { broadcastVibeEvent } from "@/lib/event-bus";
+import { syncTaskToObsidian, exportDebateToObsidian } from "@/lib/obsidian-sync";
 import type {
   OrchestratorPhase,
   OrchestratorState,
@@ -1136,6 +1137,16 @@ ${synthesisSummary.slice(0, 5000)}${synthesisSummary.length > 5000 ? "\n\n... (t
       phase.toLowerCase(),
       this.state.currentRound
     );
+
+    // Auto-sync task & debate progress to Obsidian vault asynchronously
+    syncTaskToObsidian(this.taskId).catch((err) =>
+      console.warn(`[Orchestrator] Obsidian task sync error (${this.taskId}):`, err?.message)
+    );
+    if (phase === "SYNTHESIS" || phase === "COMPLETE") {
+      exportDebateToObsidian(this.taskId).catch((err) =>
+        console.warn(`[Orchestrator] Obsidian debate export error (${this.taskId}):`, err?.message)
+      );
+    }
   }
 
   /**
