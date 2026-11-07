@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
+import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface DaemonControllerModalProps {
   isOpen: boolean;
@@ -96,9 +97,7 @@ export function DaemonControllerModal({ isOpen, onClose }: DaemonControllerModal
         {/* Header */}
         <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-card/80">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-primary/10 text-primary rounded-xl border border-primary/20">
-              <Zap className="w-5 h-5" />
-            </div>
+            <VibeFlowLogo size="sm" showText={false} withGlow />
             <div>
               <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <span>Contrôleur Maître Daemon 24/7</span>

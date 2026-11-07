@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
+import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface AuthDialogProps {
   isOpen: boolean;
@@ -108,9 +109,7 @@ export function AuthDialog({
         {/* Header */}
         <div className="px-6 py-4 border-b border-border bg-card/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary">
-              <Lock className="w-4 h-4" />
-            </div>
+            <VibeFlowLogo size="sm" showText={false} withGlow />
             <div>
               <h2 className="text-sm font-bold text-foreground">
                 {mode === "login" ? "Connexion à VibeFlow" : "Créer un Compte"}

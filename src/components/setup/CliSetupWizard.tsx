@@ -26,6 +26,7 @@ import {
   Key,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
+import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface CliSetupWizardProps {
   isOpen: boolean;
@@ -370,9 +371,7 @@ export function CliSetupWizard({ isOpen, onClose }: CliSetupWizardProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/60">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-              <Zap className="w-5 h-5" />
-            </div>
+            <VibeFlowLogo size="md" showText={false} withGlow />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold">Assistance CLIs Pro (0€ de jetons)</h2>

@@ -20,7 +20,18 @@ export const metadata: Metadata = {
   title: "VibeFlow Studio — VibeCoding & AI Agent Orchestration",
   description:
     "Full-stack VibeCoding platform with dual-agent orchestration, CloudCLI, and intelligent toolbox management.",
-  icons: { icon: "/favicon.ico" },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

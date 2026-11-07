@@ -35,6 +35,7 @@ import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide"
 import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { AdminConsoleModal } from "@/components/admin/AdminConsoleModal";
+import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
@@ -132,15 +133,8 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
     <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 gap-4 shrink-0">
       {/* Left: Logo + Project Selector */}
       <div className="flex items-center gap-4">
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight">
-            VibeFlow<span className="text-primary">Studio</span>
-          </span>
-        </div>
+        {/* Official Brand Logo */}
+        <VibeFlowLogo size="sm" withGlow href="/dashboard" />
 
         {/* Project Selector */}
         <div className="relative">

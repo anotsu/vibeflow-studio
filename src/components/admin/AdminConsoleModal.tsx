@@ -34,6 +34,7 @@ import {
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import type { SafeUser } from "@/lib/auth";
+import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface AdminConsoleModalProps {
   isOpen: boolean;
@@ -259,9 +260,7 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
         {/* Header */}
         <div className="px-6 py-4 border-b border-border bg-card/90 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-primary/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Shield className="w-5 h-5" />
-            </div>
+            <VibeFlowLogo size="md" showText={false} withGlow />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-foreground">

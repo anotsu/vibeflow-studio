@@ -112,3 +112,4 @@ SORT created DESC
 | **Store SkillsMP & Recommandations** | `src/lib/skillsmp-client.ts` | Marketplace de compétences IA (skillsmp.com) & recommandations au cadrage |
 | **Sécurité & Droits (RBAC)** | `src/lib/auth.ts` | Authentification scrypt, sessions HttpOnly, rôles USER/ADMIN, AuditLog & Guards |
 | **Console d'Administration** | `src/components/admin/AdminConsoleModal.tsx` | Gestion des comptes, rôles, statuts, journaux d'audit et santé worktrees |
+| **Identité Visuelle & Icônes** | `src/components/brand/VibeFlowLogo.tsx` | Logo vectoriel SVG multi-tailles, favicons (SVG, ICO, PNG 16/32/180/192/512) et PWA manifest |
