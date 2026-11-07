@@ -10,6 +10,7 @@ import net from "net";
 import fs from "fs";
 import path from "path";
 import { getAgentWorktreePath, AgentWorktreeRole } from "@/lib/git-worktree-manager";
+import { getDevExecutionPlan } from "@/lib/stack-detector";
 
 export type { AgentWorktreeRole };
 
@@ -117,26 +118,16 @@ export async function ensurePreviewServer(
 
   previewRegistry.set(key, instance);
 
-  // Check if there is a package.json to run dev
-  const pkgPath = path.join(worktreePath, "package.json");
-  let hasDevScript = false;
-  if (fs.existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-      hasDevScript = Boolean(pkg.scripts?.dev || pkg.scripts?.start);
-    } catch {}
-  }
+  // Compute dynamic execution plan based on detected framework (Next.js, Vite, Nuxt, FastAPI, Rust, etc.)
+  const plan = getDevExecutionPlan(worktreePath, port);
+  console.log(`[PreviewOrchestrator] Starting ${plan.stackName} dev server for ${key} on port ${port}...`);
 
-  if (hasDevScript) {
-    console.log(`[PreviewOrchestrator] Starting dev server for ${key} on port ${port}...`);
-
-    const devProcess = spawn("npm", ["run", "dev", "--", "-p", String(port)], {
+  try {
+    const devProcess = spawn(plan.command, plan.args, {
       cwd: worktreePath,
       env: {
         ...process.env,
-        PORT: String(port),
-        VITE_PORT: String(port),
-        NEXT_TELEMETRY_DISABLED: "1",
+        ...plan.env,
       },
       stdio: ["ignore", "pipe", "pipe"],
       detached: false,
@@ -147,7 +138,7 @@ export async function ensurePreviewServer(
 
     devProcess.stdout?.on("data", (data) => {
       const out = data.toString();
-      if (out.includes("ready") || out.includes("Local:") || out.includes("http")) {
+      if (out.includes("ready") || out.includes("Local:") || out.includes("http") || out.includes("listening")) {
         instance.status = "running";
       }
     });
@@ -167,9 +158,10 @@ export async function ensurePreviewServer(
         instance.status = "running";
       }
     }, 2500);
-  } else {
-    // If no dev script (e.g. pure static files), mark as running for direct file serving
-    instance.status = "running";
+  } catch (err: any) {
+    console.error(`[PreviewOrchestrator] Failed to spawn dev server for ${key}:`, err);
+    instance.status = "error";
+    instance.error = err?.message || String(err);
   }
 
   return instance;

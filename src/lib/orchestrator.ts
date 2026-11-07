@@ -10,6 +10,7 @@ import { createCoolifyService, CoolifyService } from "@/lib/coolify";
 import { decrypt } from "@/lib/utils";
 import { broadcastVibeEvent } from "@/lib/event-bus";
 import { syncTaskToObsidian, exportDebateToObsidian } from "@/lib/obsidian-sync";
+import { buildSkillsAndPersonaPrompt, getCurrentPersonas } from "@/lib/agent-skills";
 import type {
   OrchestratorPhase,
   OrchestratorState,
@@ -376,7 +377,12 @@ export class DualAgentOrchestrator {
       ? recentCommits.map((c) => `- ${c.sha.slice(0, 7)}: ${c.message}`).join("\n")
       : "- Initial setup & clean project structure";
 
+    const personas = getCurrentPersonas();
+    const skillsPrompt = buildSkillsAndPersonaPrompt();
+
     const systemPrompt = `${CLAUDE_PERSONA}
+${personas.claude.customPrompt ? `\n[PERSONA ACTIF: ${personas.claude.name}]\n${personas.claude.customPrompt}\n` : ""}
+${skillsPrompt}
 
 You are working on a software development task. Your implementation will go on branch "${this.state.claudeBranch}".
 Another agent (Antigravity) is independently implementing the same task on a separate branch.
@@ -446,7 +452,12 @@ Please provide your complete implementation plan with all code changes.`;
       ? recentCommits.map((c) => `- ${c.sha.slice(0, 7)}: ${c.message}`).join("\n")
       : "- Initial setup & clean project structure";
 
+    const personas = getCurrentPersonas();
+    const skillsPrompt = buildSkillsAndPersonaPrompt();
+
     const systemPrompt = `${ANTIGRAVITY_PERSONA}
+${personas.antigravity.customPrompt ? `\n[PERSONA ACTIF: ${personas.antigravity.name}]\n${personas.antigravity.customPrompt}\n` : ""}
+${skillsPrompt}
 
 You are working on a software development task. Your implementation will go on branch "${this.state.antigravityBranch}".
 Another agent (Claude) is independently implementing the same task on a separate branch.

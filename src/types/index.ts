@@ -236,7 +236,7 @@ export interface ToolboxDetectedItem {
 
 // ─── UI State Types ─────────────────────────────────────────
 
-export type WorkspaceTab = "kanban" | "arena" | "toolbox";
+export type WorkspaceTab = "kanban" | "arena" | "toolbox" | "analytics";
 export type CliTab = "bash" | "claude" | "antigravity" | "coolify-logs";
 
 export interface UIState {

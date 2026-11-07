@@ -31,6 +31,7 @@ import {
   Code2,
   X,
   Sparkles,
+  FileText,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -129,6 +130,70 @@ export function Toolbox() {
   const [newToolStatus, setNewToolStatus] = useState<"MISSING" | "ACQUIRED">("MISSING");
   const [newToolDescription, setNewToolDescription] = useState("");
   const [isAddingTool, setIsAddingTool] = useState(false);
+  const [generatingDocs, setGeneratingDocs] = useState(false);
+
+  const handleGenerateDocs = async () => {
+    if (!selectedProject) return;
+    setGeneratingDocs(true);
+    try {
+      const res = await fetch(`/api/projects/${selectedProject.id}/generate-docs`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addNotification({
+          type: "success",
+          title: "Architecture & OpenAPI Synchronisés",
+          message: `${data.result.endpointsCount} routes et diagrammes Mermaid publiés dans Obsidian !`,
+          autoDismissMs: 4000,
+        });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur Documentation",
+        message: err.message || "Impossible de générer la documentation.",
+        autoDismissMs: 3500,
+      });
+    } finally {
+      setGeneratingDocs(false);
+    }
+  };
+
+  const [isExportingModule, setIsExportingModule] = useState(false);
+
+  const handleExportModule = async (item: ToolboxItem) => {
+    setIsExportingModule(true);
+    try {
+      const res = await fetch(`/api/toolbox/${item.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "export_module" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addNotification({
+          type: "success",
+          title: "Brique Exportée avec Succès !",
+          message: data.message || `Module ${item.name} synchronisé dans Obsidian (08_Toolbox_Templates/).`,
+          autoDismissMs: 4000,
+        });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur Export",
+        message: err.message,
+        autoDismissMs: 3500,
+      });
+    } finally {
+      setIsExportingModule(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedProject) {
@@ -327,6 +392,19 @@ export function Toolbox() {
             )}
             Scanner le projet
           </button>
+          <button
+            onClick={handleGenerateDocs}
+            disabled={generatingDocs}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-md transition-colors disabled:opacity-50"
+            title="Générer les spécifications OpenAPI et diagrammes Mermaid d'architecture vers Obsidian"
+          >
+            {generatingDocs ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+            ) : (
+              <FileText className="w-3.5 h-3.5 text-primary" />
+            )}
+            <span className="hidden sm:inline">Docs & OpenAPI</span>
+          </button>
         </div>
       </div>
 
@@ -470,21 +548,37 @@ export function Toolbox() {
               </span>
               <div className="flex items-center gap-2">
                 {snippetCode && (
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(snippetCode);
-                      setCopiedSnippet(true);
-                      setTimeout(() => setCopiedSnippet(false), 2000);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
-                  >
-                    {copiedSnippet ? (
-                      <Check className="w-3.5 h-3.5 text-green-400" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                    <span>{copiedSnippet ? "Copié !" : "Copier le code"}</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleExportModule(selectedSnippetItem)}
+                      disabled={isExportingModule}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-secondary hover:bg-secondary/80 text-foreground border border-border transition-colors disabled:opacity-50"
+                      title="Sauvegarder ce module consensuel dans Obsidian (08_Toolbox_Templates) pour réutilisation 1-clic (Phase 8.1)"
+                    >
+                      {isExportingModule ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      <span>{isExportingModule ? "Export..." : "Exporter Brique"}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(snippetCode);
+                        setCopiedSnippet(true);
+                        setTimeout(() => setCopiedSnippet(false), 2000);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-secondary hover:bg-secondary/80 text-foreground transition-colors"
+                    >
+                      {copiedSnippet ? (
+                        <Check className="w-3.5 h-3.5 text-green-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                      <span>{copiedSnippet ? "Copié !" : "Copier le code"}</span>
+                    </button>
+                  </>
                 )}
 
                 {selectedSnippetItem.status === "MISSING" && (

@@ -23,6 +23,8 @@ updated: 2026-11-07
 - 💬 **Débats d'Architecture** : Dossier [[04_AI_Debates_Logs/|04_AI_Debates_Logs (Transcriptions Débats Contradictoires)]]
 - 🛡️ **Rapports d'Auto-Guérison** : Dossier [[05_Self_Healing_Reports/|05_Self_Healing_Reports (Post-Mortem CI/CD)]]
 - 🧭 **Cahiers des Charges & Cadrages** : Dossier [[06_Project_Blueprints/|06_Project_Blueprints (Charters de Projets)]]
+- 📐 **Spécifications OpenAPI & Mermaid** : Dossier [[07_API_Specs/|07_API_Specs (Architecture Continue)]]
+- 📦 **Briques Consensuelles Clé en Main** : Dossier [[08_Toolbox_Templates/|08_Toolbox_Templates (Templates de Modules)]]
 
 ---
 
@@ -99,3 +101,9 @@ SORT created DESC
 | **Moteur Sync Obsidian** | `src/lib/obsidian-sync.ts` | Pont bidirectionnel UTF-8 strict (Kanban, Débats, Rapports, Blueprints) |
 | **Auto-Guérison CI/CD** | `src/lib/self-healing.ts` | Analyse IA des logs d'erreur de build Coolify & génération de patchs auto |
 | **Boîte à Outils (Toolbox)** | `src/components/toolbox/Toolbox.tsx` | Détection, installation et vérification des dépendances techniques |
+| **Tests E2E & Web Vitals** | `src/lib/playwright-runner.ts` | Audit automatisé Playwright Headless (LCP, CLS, TTFB, Hydration) |
+| **Tunnels Mobiles Éphémères** | `src/lib/tunnel-manager.ts` | Liens publics temporaires et QR codes pour tests réels sur smartphone |
+| **Dashboard Analytics & Vélocité** | `src/components/dashboard/AnalyticsDashboard.tsx` | Visualisation MTTR, victoires duels, tendance de vélocité 7j et ROI tokens |
+| **Détecteur Multi-Stacks Polyglotte** | `src/lib/stack-detector.ts` | Détection & exécution dev auto (Next.js, Vite, Nuxt, FastAPI, Rust, Go) |
+| **Documentation Continue & OpenAPI** | `src/lib/api-docs-generator.ts` | Génération de specs OpenAPI 3.1 & diagrammes Mermaid ER / Architecture |
+| **Marketplace Skills & Personas** | `src/lib/agent-skills.ts` | Personas personnalisés et compétences métiers (OWASP, 60fps, WCAG) |

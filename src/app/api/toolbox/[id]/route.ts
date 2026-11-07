@@ -6,6 +6,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai-provider";
+import { pushToLiveObsidianApi, getVibeFlowVaultDir } from "@/lib/obsidian-sync";
+import fs from "fs";
+import path from "path";
 import type { ToolboxStatus } from "@prisma/client";
 
 type RouteParams = { params: Promise<{ id: string }> };
@@ -123,6 +126,64 @@ Fournis :
         success: true,
         snippetCode,
         provider: aiRes.provider,
+      });
+    }
+
+    if (action === "export_module") {
+      // Export validated module to global Obsidian toolbox templates (Phase 8.1)
+      const cleanName = item.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const vaultRelative = `VibeFlow/08_Toolbox_Templates/MODULE_${cleanName}.md`;
+
+      const code = item.snippetCode || "```typescript\n// Code snippet non généré\n```";
+
+      const templateContent = `---
+tags: [vibeflow, toolbox, reusable-module, template]
+module: ${item.name}
+category: ${item.category}
+version: ${item.version || "latest"}
+exported_from_project: ${item.project.name}
+exported_at: ${new Date().toISOString().split("T")[0]}
+---
+
+# 📦 Module Réutilisable VibeFlow : ${item.name}
+
+> [!TIP] Module Consensuel Clé en Main (Phase 8.1)
+> Ce composant architectural a été validé et exporté depuis le projet **${item.project.name}**.
+> Il peut être injecté dans n'importe quel nouveau projet via VibeFlow Studio.
+
+### Catégorie : \`${item.category}\`
+### Description
+${item.description || "Composant prêt à l'emploi"}
+
+---
+
+## 🛠️ Code Source & Architecture d'Intégration
+
+${code}
+
+---
+
+## 🚀 Commande d'Injection Rapide
+\`\`\`bash
+# Dépendances recommandées
+npm install ${item.name.toLowerCase().replace(/[^a-z0-9@-]/g, "")}
+\`\`\`
+`;
+
+      const vaultDir = getVibeFlowVaultDir();
+      const targetDir = path.join(vaultDir, "08_Toolbox_Templates");
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      fs.writeFileSync(path.join(targetDir, `MODULE_${cleanName}.md`), templateContent, "utf-8");
+      const synced = await pushToLiveObsidianApi(vaultRelative, templateContent);
+
+      return NextResponse.json({
+        success: true,
+        message: `Module "${item.name}" exporté vers la boîte à outils globale (Obsidian).`,
+        vaultPath: vaultRelative,
+        syncedToObsidian: synced,
       });
     }
 

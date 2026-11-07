@@ -114,9 +114,9 @@ updated: 2026-11-07
 ### 6.1 Prise en Charge Multi-Stacks Polyglottes (Next.js, Vite, FastAPI, Rust)
 - **Concept** : Permettre à VibeFlow d'importer et d'optimiser n'importe quel dépôt GitHub, quel que soit le langage.
 - **Actions** :
-  - [ ] #task #claude [priority:: high] Détection automatique du moteur de build (`Next.js`, `Vite/React`, `Vue/Nuxt`, `SvelteKit`, `FastAPI/Python`, `Rust Axum`).
-  - [ ] #task #claude [priority:: high] Génération dynamique du script de démarrage du serveur de preview éphémère selon la stack détectée (`npm run dev`, `uvicorn`, `cargo watch`).
-  - [ ] #task #antigravity [priority:: medium] Badges de technologie détectée affichés sur la fiche projet dans la TopBar.
+  - [x] #task #claude [priority:: high] Détection automatique du moteur de build (`Next.js`, `Vite/React`, `Vue/Nuxt`, `SvelteKit`, `FastAPI/Python`, `Rust Axum`).
+  - [x] #task #claude [priority:: high] Génération dynamique du script de démarrage du serveur de preview éphémère selon la stack détectée (`npm run dev`, `uvicorn`, `cargo watch`).
+  - [x] #task #antigravity [priority:: medium] Badges de technologie détectée affichés sur la fiche projet dans la TopBar.
 
 ### 6.2 Tunnels Éphémères Mobiles (Cloudflare Tunnel / Ngrok / Tailscale)
 - **Concept** : Tester l'application sur un smartphone réel sans configuration DNS ou port-forwarding.
@@ -153,8 +153,8 @@ updated: 2026-11-07
 ### 7.3 Dashboard Analytics de Vitesse & Vélocité d'Équipe IA
 - **Concept** : Visualiser la progression et la vélocité de l'ingénierie augmentée.
 - **Actions** :
-  - [ ] #task #antigravity [priority:: medium] Graphiques de progression dans le Cockpit : vélocité hebdomadaire, temps moyen de résolution de tâche (MTTR), ratio de victoires Claude vs Antigravity.
-  - [ ] #task #antigravity [priority:: medium] Projection financière des économies de tokens cumulées sur l'année.
+  - [x] #task #antigravity [priority:: medium] Graphiques de progression dans le Cockpit : vélocité hebdomadaire, temps moyen de résolution de tâche (MTTR), ratio de victoires Claude vs Antigravity.
+  - [x] #task #antigravity [priority:: medium] Projection financière des économies de tokens cumulées sur l'année.
 
 ---
 
@@ -164,17 +164,17 @@ updated: 2026-11-07
 ### 8.1 Boîte à Outils ("Toolbox Store") & Export 1-Clic de Modules
 - **Concept** : Sauvegarder les modules consensuels validés pour les réutiliser dans n'importe quel autre projet en 1 clic.
 - **Actions** :
-  - [ ] #task #antigravity [priority:: high] Possibilité d'exporter n'importe quelle implémentation consensuelle vers la `Toolbox` globale comme module prêt à l'emploi (ex: Auth NextAuth, Stripe Checkout, Dark Mode, etc.).
-  - [ ] #task #claude [priority:: medium] Injection automatique du code et des dépendances associées dans un nouveau projet via `npm install` et copie de templates.
+  - [x] #task #antigravity [priority:: high] Possibilité d'exporter n'importe quelle implémentation consensuelle vers la `Toolbox` globale comme module prêt à l'emploi (ex: Auth NextAuth, Stripe Checkout, Dark Mode, etc.).
+  - [x] #task #claude [priority:: medium] Injection automatique du code et des dépendances associées dans un nouveau projet via `npm install` et copie de templates.
 
 ### 8.2 Auto-Génération de Documentation Technique Continue (Obsidian Docs & OpenAPI)
 - **Concept** : Une documentation vivante toujours à jour avec le code réel en production.
 - **Actions** :
-  - [ ] #task #claude [priority:: high] À chaque PR fusionnée sur main, génération automatique de la fiche d'architecture dans `VibeFlow/06_API_Specs/` et mise à jour du `README.md` du dépôt GitHub.
-  - [ ] #task #antigravity [priority:: medium] Génération automatique de diagrammes Mermaid d'architecture basés sur les composants React et relations Prisma réels.
+  - [x] #task #claude [priority:: high] À chaque PR fusionnée sur main, génération automatique de la fiche d'architecture dans `VibeFlow/06_API_Specs/` et mise à jour du `README.md` du dépôt GitHub.
+  - [x] #task #antigravity [priority:: medium] Génération automatique de diagrammes Mermaid d'architecture basés sur les composants React et relations Prisma réels.
 
 ### 8.3 Marketplace de Compétences IA Personnalisées (Custom Skills & Personas)
 - **Concept** : Étendre l'intelligence des agents avec des règles métiers spécialisées.
 - **Actions** :
-  - [ ] #task #claude [priority:: high] Système de "Skills" pluggables pour orienter le débat IA (ex: Skill Sécurité OWASP, Skill SEO & Métadonnées, Skill Accessibilité RGAA/WCAG).
-  - [ ] #task #antigravity [priority:: medium] Éditeur d'instructions de personas dans l'interface permettant de personnaliser le tempérament de chaque agent (ex: Claude "Auditeur Sécurité Paranoïaque" vs Antigravity "Designer Apple Minimaliste").
+  - [x] #task #claude [priority:: high] Système de "Skills" pluggables pour orienter le débat IA (ex: Skill Sécurité OWASP, Skill SEO & Métadonnées, Skill Accessibilité RGAA/WCAG).
+  - [x] #task #antigravity [priority:: medium] Éditeur d'instructions de personas dans l'interface permettant de personnaliser le tempérament de chaque agent (ex: Claude "Auditeur Sécurité Paranoïaque" vs Antigravity "Designer Apple Minimaliste").

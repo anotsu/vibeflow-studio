@@ -13,6 +13,7 @@ import {
   Loader2,
   FolderGit2,
   Compass,
+  TrendingUp,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -20,6 +21,7 @@ import { CloudCLI } from "@/components/layout/CloudCLI";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { DualBranchArena } from "@/components/arena/DualBranchArena";
 import { Toolbox } from "@/components/toolbox/Toolbox";
+import { AnalyticsDashboard } from "@/components/dashboard/AnalyticsDashboard";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { WorkspaceTab } from "@/types";
@@ -47,6 +49,11 @@ const WORKSPACE_TABS: Array<{
     id: "toolbox",
     label: "Boîte à Outils",
     icon: <Package className="w-3.5 h-3.5" />,
+  },
+  {
+    id: "analytics",
+    label: "Analytics & Vélocité",
+    icon: <TrendingUp className="w-3.5 h-3.5" />,
   },
 ];
 
@@ -259,6 +266,7 @@ export default function DashboardPage() {
               {activeWorkspaceTab === "kanban" && <KanbanBoard />}
               {activeWorkspaceTab === "arena" && <DualBranchArena />}
               {activeWorkspaceTab === "toolbox" && <Toolbox />}
+              {activeWorkspaceTab === "analytics" && <AnalyticsDashboard />}
             </div>
           </div>
 

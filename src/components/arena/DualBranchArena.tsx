@@ -47,6 +47,7 @@ import type { AgentDebateLog } from "@prisma/client";
 import type { TaskBenchmarkResult } from "@/lib/sandbox-runner";
 import type { DualE2ETestResult } from "@/lib/playwright-runner";
 import type { MobileTunnelInfo } from "@/lib/tunnel-manager";
+import { PersonasSkillsModal } from "@/components/arena/PersonasSkillsModal";
 
 type ArenaView = "diff" | "debate" | "preview";
 
@@ -77,6 +78,9 @@ export function DualBranchArena() {
   const [isGeneratingTunnel, setIsGeneratingTunnel] = useState(false);
   const [tunnelInfo, setTunnelInfo] = useState<MobileTunnelInfo | null>(null);
   const [mobileTunnelModalOpen, setMobileTunnelModalOpen] = useState(false);
+
+  // Personas & Skills modal state
+  const [personasModalOpen, setPersonasModalOpen] = useState(false);
 
   // Filter tasks that have dual branches or candidate tasks
   const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -445,6 +449,16 @@ export function DualBranchArena() {
             <span>{isGeneratingHybrid ? "Synthèse Hybride..." : "🧬 Synthèse Hybride"}</span>
           </button>
 
+          {/* Personas & Skills Button */}
+          <button
+            onClick={() => setPersonasModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground border border-border rounded-md transition-all shadow-sm"
+            title="Personnaliser les personas et compétences métiers (Skills) des agents"
+          >
+            <Sliders className="w-3.5 h-3.5 text-primary" />
+            <span className="hidden sm:inline">🎭 Skills & Personas</span>
+          </button>
+
           {/* View Mode Switcher */}
           <div className="flex items-center bg-secondary rounded-md p-0.5 border border-border/50">
             {(
@@ -548,6 +562,12 @@ export function DualBranchArena() {
           onChangeRole={handleOpenMobileTunnel}
         />
       )}
+
+      {/* Personas & Specialized Skills Modal */}
+      <PersonasSkillsModal
+        isOpen={personasModalOpen}
+        onClose={() => setPersonasModalOpen(false)}
+      />
     </div>
   );
 }

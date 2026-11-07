@@ -32,7 +32,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
-  const { projects, selectedProject, toggleMode, fetchProjects } =
+  const { projects, selectedProject, toggleMode, fetchProjects, toolboxItems } =
     useProjectStore();
   const { setSelectedProjectId, notifications, addNotification } = useUIStore();
   const [isTicking, setIsTicking] = useState(false);
@@ -182,6 +182,28 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
               </a>
             )}
           </div>
+
+          {/* Polyglot Tech Stack Badges */}
+          {toolboxItems && toolboxItems.length > 0 && (
+            <div className="hidden xl:flex items-center gap-1.5 border-l border-border/60 pl-4">
+              {toolboxItems
+                .filter(
+                  (t) =>
+                    t.status === "ACQUIRED" &&
+                    (t.category === "FRAMEWORK" || t.category === "DATABASE" || t.category === "UI_KIT")
+                )
+                .slice(0, 3)
+                .map((tool) => (
+                  <span
+                    key={tool.id}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-secondary text-foreground/80 border border-border"
+                    title={`${tool.name} (${tool.category})`}
+                  >
+                    {tool.name}
+                  </span>
+                ))}
+            </div>
+          )}
         </div>
       )}
 

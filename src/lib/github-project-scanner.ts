@@ -129,6 +129,8 @@ export async function scanAndAnalyzeGitHubRepo(
     prismaSchemaRaw,
     pyprojectRaw,
     requirementsRaw,
+    cargoTomlRaw,
+    goModRaw,
   ] = await Promise.all([
     fetchFile("README.md").then((r) => r || fetchFile("readme.md")).then((r) => r || fetchFile("README")),
     fetchFile("package.json"),
@@ -137,6 +139,8 @@ export async function scanAndAnalyzeGitHubRepo(
     fetchFile("prisma/schema.prisma"),
     fetchFile("pyproject.toml"),
     fetchFile("requirements.txt"),
+    fetchFile("Cargo.toml"),
+    fetchFile("go.mod"),
   ]);
 
   // 6. Fetch recent issues and commits
@@ -206,21 +210,58 @@ export async function scanAndAnalyzeGitHubRepo(
     return false;
   };
 
-  // Frameworks & Core
+  // Frameworks & Core Polyglot Stacks
   if (checkDep("next", "Next.js", "FRAMEWORK", "Framework React Fullstack SSR & Edge")) {
     if (allDeps["typescript"]) detectedStack.push("TypeScript");
+  } else if (checkDep("nuxt", "Nuxt 3", "FRAMEWORK", "Framework Vue.js Fullstack SSR")) {
+    if (allDeps["typescript"]) detectedStack.push("TypeScript");
+  } else if (checkDep("@sveltejs/kit", "SvelteKit", "FRAMEWORK", "Framework Svelte Fullstack")) {
+    if (allDeps["typescript"]) detectedStack.push("TypeScript");
+  } else if (checkDep("vite", "Vite", "FRAMEWORK", "Build tool ultra-rapide Frontend")) {
+    if (checkDep("react", "React", "FRAMEWORK", "Bibliothèque UI")) {}
+    else if (checkDep("vue", "Vue.js", "FRAMEWORK", "Framework UI progressif")) {}
   } else if (checkDep("react", "React", "FRAMEWORK", "Bibliothèque UI")) {
     // React alone
   } else if (checkDep("vue", "Vue.js", "FRAMEWORK", "Framework UI progressif")) {}
 
+  // Python ecosystem
   if (pyprojectRaw || requirementsRaw) {
-    detectedStack.push("Python");
+    const pyText = `${pyprojectRaw || ""} ${requirementsRaw || ""}`.toLowerCase();
+    const isFastAPI = pyText.includes("fastapi");
+    const stackLabel = isFastAPI ? "FastAPI / Python" : "Python";
+    detectedStack.push(stackLabel);
     toolboxItems.push({
-      name: "Python Runtime",
+      name: stackLabel,
       category: "FRAMEWORK",
       status: "ACQUIRED",
-      description: "Environnement Python",
+      description: isFastAPI ? "API REST async haute performance Python" : "Environnement Python",
       sourceFile: pyprojectRaw ? "pyproject.toml" : "requirements.txt",
+    });
+  }
+
+  // Rust ecosystem
+  if (cargoTomlRaw) {
+    const isAxum = cargoTomlRaw.includes("axum") || cargoTomlRaw.includes("actix-web");
+    const stackLabel = isAxum ? "Rust Axum" : "Rust Cargo";
+    detectedStack.push(stackLabel);
+    toolboxItems.push({
+      name: stackLabel,
+      category: "FRAMEWORK",
+      status: "ACQUIRED",
+      description: "Architecture système & Backend Rust haute performance",
+      sourceFile: "Cargo.toml",
+    });
+  }
+
+  // Go ecosystem
+  if (goModRaw) {
+    detectedStack.push("Go");
+    toolboxItems.push({
+      name: "Go Server",
+      category: "FRAMEWORK",
+      status: "ACQUIRED",
+      description: "Service Go compilé concurrent & léger",
+      sourceFile: "go.mod",
     });
   }
 
