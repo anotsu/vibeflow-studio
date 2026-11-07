@@ -3,7 +3,7 @@
 // ============================================================
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   GitBranch,
   Cloud,
@@ -20,13 +20,21 @@ import {
   Sliders,
   Compass,
   Store,
+  LogOut,
+  UserCircle,
+  ShieldAlert,
+  User,
+  ShieldCheck,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
+import { useAuthStore } from "@/stores/auth-store";
 import { TokenSavingsBadge } from "@/components/dashboard/TokenSavingsTracker";
 import { DaemonControllerModal } from "@/components/dashboard/DaemonControllerModal";
 import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide";
 import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
+import { AuthDialog } from "@/components/auth/AuthDialog";
+import { AdminConsoleModal } from "@/components/admin/AdminConsoleModal";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
@@ -37,10 +45,33 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const { projects, selectedProject, toggleMode, fetchProjects, toolboxItems } =
     useProjectStore();
   const { setSelectedProjectId, notifications, addNotification } = useUIStore();
+  const { user, isAdmin, isAuthenticated, logout, fetchMe } = useAuthStore();
   const [isTicking, setIsTicking] = useState(false);
   const [daemonModalOpen, setDaemonModalOpen] = useState(false);
   const [framingGuideOpen, setFramingGuideOpen] = useState(false);
   const [skillsMpStoreOpen, setSkillsMpStoreOpen] = useState(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [adminConsoleOpen, setAdminConsoleOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    if (userMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [userMenuOpen]);
 
   const isAuto = selectedProject?.mode === "AUTO";
 
@@ -305,7 +336,100 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
         >
           <Settings className="w-4 h-4" />
         </button>
+
+        {/* User Account / Auth & Admin Console */}
+        {isAuthenticated && user ? (
+          <div className="relative" ref={userMenuRef}>
+            <button
+              onClick={() => setUserMenuOpen((v) => !v)}
+              className="flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary border border-border transition-colors text-xs font-medium"
+              title={`Compte: ${user.name} (${user.role})`}
+            >
+              <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">
+                {user.name.charAt(0).toUpperCase()}
+              </div>
+              <span className="hidden sm:inline text-foreground max-w-[90px] truncate">
+                {user.name}
+              </span>
+              <span
+                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                  user.role === "ADMIN"
+                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                    : "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                }`}
+              >
+                {user.role}
+              </span>
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            </button>
+
+            {/* User Dropdown Menu */}
+            {userMenuOpen && (
+              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-card border border-border shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95">
+                <div className="px-3 py-2 border-b border-border/60">
+                  <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span
+                      className={`inline-block w-1.5 h-1.5 rounded-full ${
+                        user.status === "ACTIVE" ? "bg-emerald-400" : "bg-amber-400"
+                      }`}
+                    />
+                    <span className="text-[10px] text-muted-foreground font-mono">
+                      Statut: {user.status}
+                    </span>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      setAdminConsoleOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-500/10 transition-colors text-left"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>Console Administration</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={async () => {
+                    setUserMenuOpen(false);
+                    await logout();
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <span>Se Déconnecter</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setAuthDialogOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-sm"
+            title="Connexion / Inscription à VibeFlow Studio"
+          >
+            <UserCircle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Se Connecter</span>
+          </button>
+        )}
       </div>
+
+      {/* Auth Modal */}
+      <AuthDialog
+        isOpen={authDialogOpen}
+        onClose={() => setAuthDialogOpen(false)}
+      />
+
+      {/* Admin Console Modal */}
+      <AdminConsoleModal
+        isOpen={adminConsoleOpen}
+        onClose={() => setAdminConsoleOpen(false)}
+      />
 
       {/* Daemon 24/7 Autonomy Controller Modal */}
       <DaemonControllerModal

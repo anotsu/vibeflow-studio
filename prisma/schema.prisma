@@ -102,6 +102,17 @@ enum DeploymentEnvironment {
   STAGING
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+}
+
 // ─── Models ──────────────────────────────────────────────────
 
 model Project {
@@ -121,6 +132,8 @@ model Project {
   githubToken      String?      @db.Text  // encrypted
 
   // Relationships
+  userId           String?
+  user             User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   milestones       Milestone[]
   toolboxItems     ToolboxItem[]
   tasks            Task[]
@@ -131,6 +144,7 @@ model Project {
   updatedAt        DateTime     @updatedAt
 
   @@index([slug])
+  @@index([userId])
 }
 
 model Milestone {
@@ -320,4 +334,62 @@ model GlobalSettings {
   
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+}
+
+// ─── Authentication & User Accounts (RBAC) ─────────────────
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String
+  passwordHash String      @db.Text
+  salt         String      @db.Text
+  role         UserRole    @default(USER)
+  status       UserStatus  @default(ACTIVE)
+  avatar       String?
+  lastLoginAt  DateTime?
+
+  // Relationships
+  sessions     Session[]
+  auditLogs    AuditLog[]
+  projects     Project[]
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  category  String   // "AUTH" | "ADMIN" | "DEPLOYMENT" | "SECURITY" | "PROJECT"
+  details   String?  @db.Text
+  ipAddress String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([category])
+  @@index([createdAt])
 }

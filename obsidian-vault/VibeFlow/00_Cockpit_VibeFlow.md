@@ -26,6 +26,7 @@ updated: 2026-11-07
 - 📐 **Spécifications OpenAPI & Mermaid** : Dossier [[07_API_Specs/|07_API_Specs (Architecture Continue)]]
 - 📦 **Briques Consensuelles Clé en Main** : Dossier [[08_Toolbox_Templates/|08_Toolbox_Templates (Templates de Modules)]]
 - ⚡ **Compétences Agent SkillsMP** : Dossier [[09_SkillsMP_Installed/|09_SkillsMP_Installed (Skills Marketplace skillsmp.com)]]
+- 🛡️ **Sécurité & Console Admin (RBAC)** : [[10_Security_RBAC/RBAC_Architecture|Architecture Sécurité, Authentification & Console d'Administration RBAC]]
 
 ---
 
@@ -109,3 +110,5 @@ SORT created DESC
 | **Documentation Continue & OpenAPI** | `src/lib/api-docs-generator.ts` | Génération de specs OpenAPI 3.1 & diagrammes Mermaid ER / Architecture |
 | **Marketplace Skills & Personas** | `src/lib/agent-skills.ts` | Personas personnalisés et compétences métiers (OWASP, 60fps, WCAG) |
 | **Store SkillsMP & Recommandations** | `src/lib/skillsmp-client.ts` | Marketplace de compétences IA (skillsmp.com) & recommandations au cadrage |
+| **Sécurité & Droits (RBAC)** | `src/lib/auth.ts` | Authentification scrypt, sessions HttpOnly, rôles USER/ADMIN, AuditLog & Guards |
+| **Console d'Administration** | `src/components/admin/AdminConsoleModal.tsx` | Gestion des comptes, rôles, statuts, journaux d'audit et santé worktrees |
