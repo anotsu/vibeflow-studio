@@ -3,7 +3,7 @@
 // ============================================================
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Plus,
   MoreHorizontal,
@@ -15,8 +15,11 @@ import {
   Sparkles,
   Bot,
   Rocket,
+  BookOpen,
+  Loader2,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
+import { useUIStore } from "@/stores/ui-store";
 import type { TaskWithRelations } from "@/types";
 import type { TaskStatus, TaskPriority } from "@prisma/client";
 
@@ -81,6 +84,8 @@ const ORIGIN_ICONS: Record<string, React.ReactNode> = {
 
 export function KanbanBoard() {
   const { tasks, selectedProject, startOrchestration } = useProjectStore();
+  const { addNotification } = useUIStore();
+  const [syncingObsidian, setSyncingObsidian] = useState(false);
 
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const getTasksForColumn = (column: KanbanColumn): TaskWithRelations[] => {
@@ -94,8 +99,65 @@ export function KanbanBoard() {
     await startOrchestration(task.id, selectedProject.id);
   };
 
+  const handleSyncObsidian = async () => {
+    setSyncingObsidian(true);
+    try {
+      const res = await fetch("/api/obsidian/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: selectedProject?.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        addNotification({
+          type: "success",
+          title: "Synchronisation Obsidian Réussie",
+          message: data.message || "Coffre et API Obsidian mis à jour.",
+          autoDismissMs: 3500,
+        });
+      } else {
+        throw new Error(data.error || "Échec synchronisation");
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur Sync Obsidian",
+        message: err.message,
+        autoDismissMs: 4000,
+      });
+    } finally {
+      setSyncingObsidian(false);
+    }
+  };
+
   return (
-    <div className="flex-1 flex gap-3 p-4 overflow-x-auto">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Top Controls Bar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-card/40 border-b border-border text-xs shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-foreground">Flux Kanban 5 Phases</span>
+          <span className="text-muted-foreground">· {safeTasks.length} tâche(s) au total</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncObsidian}
+            disabled={syncingObsidian}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all disabled:opacity-50"
+            title="Synchroniser le Kanban avec le coffre Obsidian (03_Kanban_Tasks)"
+          >
+            {syncingObsidian ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+            ) : (
+              <BookOpen className="w-3.5 h-3.5 text-purple-400" />
+            )}
+            <span>Sync Obsidian</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Columns Container */}
+      <div className="flex-1 flex gap-3 p-4 overflow-x-auto">
       {COLUMNS.map((column) => {
         const columnTasks = getTasksForColumn(column);
         return (
@@ -136,6 +198,7 @@ export function KanbanBoard() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

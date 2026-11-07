@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { broadcastVibeEvent } from "@/lib/event-bus";
 import { enqueueDeployment } from "@/lib/queue";
+import { syncTaskToObsidian, exportDebateToObsidian } from "@/lib/obsidian-sync";
+import { cleanupTaskWorktrees } from "@/lib/git-worktree-manager";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -198,6 +200,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       },
     });
 
+    // Sync to Obsidian vault asynchronously
+    syncTaskToObsidian(id).catch((err) =>
+      console.warn(`[PATCH /api/tasks/${id}] Obsidian sync failed:`, err.message)
+    );
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error("[PATCH /api/tasks/[id]] Error:", error);
@@ -269,6 +276,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           console.warn("[Merge Action] Auto-deploy enqueue failed:", err);
         }
       }
+
+      // 5. Export Debate to Obsidian & cleanup isolated worktrees
+      exportDebateToObsidian(id).catch((err) =>
+        console.warn(`[Merge Action] Failed exporting debate to Obsidian:`, err.message)
+      );
+      syncTaskToObsidian(id).catch((err) =>
+        console.warn(`[Merge Action] Failed syncing task to Obsidian:`, err.message)
+      );
+      cleanupTaskWorktrees(id).catch((err) =>
+        console.warn(`[Merge Action] Worktree cleanup failed:`, err.message)
+      );
 
       return NextResponse.json({
         success: true,

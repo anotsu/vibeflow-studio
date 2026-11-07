@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { callAI } from "@/lib/ai-provider";
 import { broadcastVibeEvent } from "@/lib/event-bus";
 import { CoolifyService } from "@/lib/coolify";
+import { exportHealingReportToObsidian } from "@/lib/obsidian-sync";
 
 export interface SelfHealingResult {
   success: boolean;
@@ -134,6 +135,16 @@ ${diagnosis}`,
       console.warn(`[Self-Healing] Could not auto-trigger Coolify re-deployment:`, err.message);
     }
   }
+
+  // 7. Export Post-Mortem Report to Obsidian vault & live API
+  exportHealingReportToObsidian(deployment.id, {
+    projectName: project.name,
+    branch: deployment.branch,
+    diagnosis,
+    patchSummary: diagnosis.slice(0, 200),
+    errorLogs,
+    success: true,
+  }).catch((err) => console.warn("[Self-Healing] Failed to export to Obsidian:", err.message));
 
   return {
     success: true,
