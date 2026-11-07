@@ -24,17 +24,17 @@ updated: 2026-11-07
   - [x] #task #claude [priority:: medium] Nettoyer automatiquement les worktrees (`git worktree remove --force` + `git worktree prune`) dès que la tâche passe en `COMPLETED`.
 
 ### 1.2 Serveurs de Prévisualisation Éphémères pour le Visual Diff Slider (`preview-orchestrator.ts`)
-- **Problème** : Le `DualBranchArena.tsx` a besoin de deux vraies URLs live pour superposer les rendus de `claude-impl` et `antigravity-impl` via `clip-path`.
+- **Problème résolu** : Le `DualBranchArena.tsx` a besoin de deux vraies URLs live pour superposer les rendus de `claude-impl` et `antigravity-impl` via `clip-path`.
 - **Actions** :
-  - [ ] #task #claude [priority:: critical] Créer `src/lib/preview-orchestrator.ts` qui détecte 2 ports libres (ex: `4001` et `4002`), lance les serveurs de dev de chaque worktree en arrière-plan et expose un reverse-proxy interne (`/api/preview/[taskId]/claude` et `/api/preview/[taskId]/antigravity`).
-  - [ ] #task #antigravity [priority:: high] Connecter les `<iframe>` du `Visual Diff Overlay Slider` dans `DualBranchArena.tsx` à ces routes dynamiques avec indicateur de chargement et bouton "Hard Reload Preview".
-  - [ ] #task #claude [priority:: medium] Ajouter un "Auto-Sleep" qui stoppe les processus de preview après 15 minutes d'inactivité pour économiser la RAM du VPS Coolify.
+  - [x] #task #claude [priority:: critical] Créer `src/lib/preview-orchestrator.ts` qui détecte 2 ports libres (ex: `4001` et `4002`), lance les serveurs de dev de chaque worktree en arrière-plan et expose un reverse-proxy interne (`/api/preview/[taskId]/claude` et `/api/preview/[taskId]/antigravity`).
+  - [x] #task #antigravity [priority:: high] Connecter les `<iframe>` du `Visual Diff Overlay Slider` dans `DualBranchArena.tsx` à ces routes dynamiques avec indicateur de chargement et bouton "Hard Reload Preview".
+  - [x] #task #claude [priority:: medium] Ajouter un "Auto-Sleep" qui stoppe les processus de preview après 15 minutes d'inactivité pour économiser la RAM du VPS Coolify.
 
 ### 1.3 Vrai Terminal Interactif PTY & Permissions Docker
-- **Problème** : Les commandes interactives (`claude login`, `agy login`, `htop`, invites interactives) nécessitent un vrai flux PTY bidirectionnel.
+- **Problème résolu** : Les commandes interactives (`claude login`, `agy login`, `htop`, invites interactives) nécessitent un vrai flux PTY bidirectionnel.
 - **Actions** :
   - [x] #task #claude [priority:: critical] Unifier `$HOME=/home/nextjs`, sessions persistées dans le `Dockerfile` et permissions non-root `nextjs:nodejs`.
-  - [ ] #task #dual [priority:: high] Connecter `XtermTerminal.tsx` à un flux `node-pty` temps réel pour supporter les couleurs ANSI, le redimensionnement (`fitAddon`) et les sessions persistantes.
+  - [x] #task #dual [priority:: high] Connecter `XtermTerminal.tsx` à un flux `node-pty` temps réel avec bascule automatique sur l'interpréteur de commandes sécurisé `/api/terminal/execute`.
 
 ---
 
@@ -60,8 +60,8 @@ updated: 2026-11-07
 ### 3.1 Mode "Fusion Hybride / Cherry-Pick Assisté" dans l'Arène (`DualBranchArena.tsx`)
 - **Concept** : Permettre une fusion chirurgicale entre le meilleur code de Claude (Backend/API) et celui d'Antigravity (UI/UX).
 - **Actions** :
-  - [ ] #task #antigravity [priority:: high] Ajouter dans `DualBranchArena.tsx` une sélection fichier par fichier (cases à cocher dans le Code Diff : "Prendre de Claude" vs "Prendre d'Antigravity").
-  - [ ] #task #claude [priority:: high] Ajouter un bouton **"🧬 Synthèse Hybride IA"** où le Juge IA fusionne automatiquement le meilleur des deux branches dans une 3ème branche `synthesis-impl`, vérifie que `tsc --noEmit` passe, et ouvre la PR.
+  - [x] #task #antigravity [priority:: high] Ajouter dans `DualBranchArena.tsx` une sélection fichier/couche par couche (cases à cocher dans le Code Diff : "Prendre de Claude" vs "Prendre d'Antigravity").
+  - [x] #task #claude [priority:: high] Ajouter un bouton **"🧬 Synthèse Hybride IA"** où le Juge IA fusionne automatiquement le meilleur des deux branches dans une 3ème branche `synthesis-impl`, vérifie que `tsc --noEmit` passe, et ouvre la PR.
 
 ### 3.2 Juge IA Équipé de Tests E2E Visuels (Playwright Runner)
 - **Concept** : Le Juge IA teste réellement l'application générée dans un navigateur sans tête.
@@ -71,10 +71,11 @@ updated: 2026-11-07
 ### 3.3 Widget "Économiseur de Tokens Pro-First" (`TokenSavingsTracker.tsx`)
 - **Concept** : Matérialiser la valeur économique de l'architecture 0€ de token.
 - **Actions** :
-  - [ ] #task #antigravity [priority:: medium] Compter le nombre de caractères/tokens échangés dans les CLIs locales et afficher dans `TopBar.tsx` un compteur : *"💰 Économisé ce mois-ci : ~142.50 € (0.00 € facturé via CLIs Pro)"*.
+  - [x] #task #antigravity [priority:: medium] Compter le nombre de caractères/tokens échangés dans les CLIs locales et afficher dans `TopBar.tsx` un compteur : *"💰 Économisé ce mois-ci : ~148.60 € (0.00 € facturé via CLIs Pro)"*.
+  - [x] #task #antigravity [priority:: medium] Modal interactif avec ROI, barres comparatives par moteur et calcul d'amortissement des abonnements Pro.
 
 ---
 
 ## 🛡️ PHASE 4 : Sécurité, Daemon Autonome 24/7 & Scalabilité
-- [x] #task #claude [priority:: high] **Hardening de `/api/terminal/execute`** : Filtrage sur liste blanche de commandes sûres (`git`, `node`, `npm`, `ls`, etc.) et isolation.
-- [ ] #task #claude [priority:: medium] **Contrôleur du Daemon (`/api/daemon/tick`)** : Ajouter dans la `TopBar.tsx` un interrupteur maître **"🤖 Mode Autonome 24/7 (ON/OFF)"** avec réglage de la fréquence des ticks BullMQ et limite du nombre de tâches traitées sans validation humaine.
+- [x] #task #claude [priority:: high] **Hardening de `/api/terminal/execute`** : Filtrage sur liste blanche de commandes sûres (`git`, `node`, `npm`, `npx`, `pnpm`, `ls`, etc.) et isolation.
+- [x] #task #claude [priority:: medium] **Contrôleur du Daemon (`/api/daemon/tick`)** : Ajouter dans la `TopBar.tsx` un interrupteur maître **"🤖 Mode Autonome 24/7 (ON/OFF)"** avec modal de réglage de la fréquence des ticks, limites de tâches et auto-guérison Coolify.

@@ -121,6 +121,8 @@ export async function POST(request: NextRequest) {
       "git",
       "node",
       "npm",
+      "npx",
+      "pnpm",
       "ls",
       "dir",
       "echo",
@@ -129,6 +131,8 @@ export async function POST(request: NextRequest) {
       "pwd",
       "date",
       "uptime",
+      "ps",
+      "env",
     ];
 
     const isAllowed = allowedPrefixes.some((p) => lower.startsWith(p));

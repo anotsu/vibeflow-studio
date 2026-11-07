@@ -1,0 +1,289 @@
+// ============================================================
+// VibeFlow Studio — Preview Orchestrator
+// Ephemeral per-task dev servers & reverse proxy for Visual Diff Slider
+// Dynamically allocates ports, runs dev servers in isolated worktrees,
+// proxies live requests, and provides 15-min auto-sleep to save RAM.
+// ============================================================
+
+import { spawn, ChildProcess } from "child_process";
+import net from "net";
+import fs from "fs";
+import path from "path";
+import { getAgentWorktreePath, AgentWorktreeRole } from "@/lib/git-worktree-manager";
+
+export type { AgentWorktreeRole };
+
+export interface PreviewInstance {
+  taskId: string;
+  role: AgentWorktreeRole;
+  port: number;
+  pid?: number;
+  process?: ChildProcess;
+  status: "starting" | "running" | "stopped" | "error";
+  worktreePath: string;
+  createdAt: number;
+  lastActivityAt: number;
+  error?: string;
+}
+
+// Global in-memory registry of active preview servers (survives requests in same process)
+const globalPreviews = global as unknown as {
+  __vibeflowPreviews?: Map<string, PreviewInstance>;
+  __vibeflowGcInterval?: NodeJS.Timeout;
+};
+
+if (!globalPreviews.__vibeflowPreviews) {
+  globalPreviews.__vibeflowPreviews = new Map<string, PreviewInstance>();
+}
+
+const previewRegistry = globalPreviews.__vibeflowPreviews;
+
+// Inactivity timeout: 15 minutes
+const AUTO_SLEEP_TIMEOUT_MS = 15 * 60 * 1000;
+
+// Setup Garbage Collection Interval (every 60 seconds)
+if (!globalPreviews.__vibeflowGcInterval) {
+  globalPreviews.__vibeflowGcInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, instance] of previewRegistry.entries()) {
+      if (
+        instance.status === "running" &&
+        now - instance.lastActivityAt > AUTO_SLEEP_TIMEOUT_MS
+      ) {
+        console.log(`[PreviewOrchestrator] Auto-sleeping idle preview: ${key} (PID: ${instance.pid})`);
+        stopPreviewServer(instance.taskId, instance.role);
+      }
+    }
+  }, 60000);
+}
+
+/**
+ * Finds a free TCP port dynamically on localhost.
+ */
+export async function findAvailablePort(startPort = 4100, endPort = 4999): Promise<number> {
+  for (let port = startPort; port <= endPort; port++) {
+    const isFree = await new Promise<boolean>((resolve) => {
+      const server = net.createServer();
+      server.unref();
+      server.on("error", () => resolve(false));
+      server.listen(port, "127.0.0.1", () => {
+        server.close(() => resolve(true));
+      });
+    });
+    if (isFree) return port;
+  }
+  throw new Error(`No available ports found between ${startPort} and ${endPort}`);
+}
+
+/**
+ * Generates cache key for an agent's preview server.
+ */
+function getInstanceKey(taskId: string, role: AgentWorktreeRole): string {
+  return `${taskId}:${role}`;
+}
+
+/**
+ * Ensures a live preview server is running for a given task and agent role.
+ */
+export async function ensurePreviewServer(
+  taskId: string,
+  role: AgentWorktreeRole
+): Promise<PreviewInstance> {
+  const key = getInstanceKey(taskId, role);
+  const existing = previewRegistry.get(key);
+
+  if (existing && existing.status === "running" && existing.pid) {
+    existing.lastActivityAt = Date.now();
+    return existing;
+  }
+
+  const worktreePath = getAgentWorktreePath(taskId, role);
+
+  if (!fs.existsSync(worktreePath)) {
+    throw new Error(`Worktree for task ${taskId} (${role}) not found at ${worktreePath}`);
+  }
+
+  const port = await findAvailablePort();
+
+  const instance: PreviewInstance = {
+    taskId,
+    role,
+    port,
+    status: "starting",
+    worktreePath,
+    createdAt: Date.now(),
+    lastActivityAt: Date.now(),
+  };
+
+  previewRegistry.set(key, instance);
+
+  // Check if there is a package.json to run dev
+  const pkgPath = path.join(worktreePath, "package.json");
+  let hasDevScript = false;
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+      hasDevScript = Boolean(pkg.scripts?.dev || pkg.scripts?.start);
+    } catch {}
+  }
+
+  if (hasDevScript) {
+    console.log(`[PreviewOrchestrator] Starting dev server for ${key} on port ${port}...`);
+
+    const devProcess = spawn("npm", ["run", "dev", "--", "-p", String(port)], {
+      cwd: worktreePath,
+      env: {
+        ...process.env,
+        PORT: String(port),
+        VITE_PORT: String(port),
+        NEXT_TELEMETRY_DISABLED: "1",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: false,
+    });
+
+    instance.process = devProcess;
+    instance.pid = devProcess.pid;
+
+    devProcess.stdout?.on("data", (data) => {
+      const out = data.toString();
+      if (out.includes("ready") || out.includes("Local:") || out.includes("http")) {
+        instance.status = "running";
+      }
+    });
+
+    devProcess.stderr?.on("data", (data) => {
+      console.warn(`[Preview ${key}] stderr:`, data.toString().slice(0, 200));
+    });
+
+    devProcess.on("exit", (code) => {
+      console.log(`[Preview ${key}] Process exited with code ${code}`);
+      instance.status = "stopped";
+    });
+
+    // Mark as running after small startup delay
+    setTimeout(() => {
+      if (instance.status === "starting") {
+        instance.status = "running";
+      }
+    }, 2500);
+  } else {
+    // If no dev script (e.g. pure static files), mark as running for direct file serving
+    instance.status = "running";
+  }
+
+  return instance;
+}
+
+/**
+ * Returns an existing preview instance or undefined.
+ */
+export function getPreviewInstance(taskId: string, role: AgentWorktreeRole): PreviewInstance | undefined {
+  const key = getInstanceKey(taskId, role);
+  const instance = previewRegistry.get(key);
+  if (instance) {
+    instance.lastActivityAt = Date.now();
+  }
+  return instance;
+}
+
+/**
+ * Stops a specific preview server and terminates its background process.
+ */
+export function stopPreviewServer(taskId: string, role: AgentWorktreeRole): boolean {
+  const key = getInstanceKey(taskId, role);
+  const instance = previewRegistry.get(key);
+
+  if (!instance) return false;
+
+  if (instance.process && instance.pid) {
+    try {
+      process.kill(instance.pid, "SIGTERM");
+    } catch {
+      try {
+        instance.process.kill("SIGKILL");
+      } catch {}
+    }
+  }
+
+  instance.status = "stopped";
+  previewRegistry.delete(key);
+  return true;
+}
+
+/**
+ * Stops all preview servers associated with a task (called upon task completion).
+ */
+export function stopAllTaskPreviews(taskId: string): void {
+  const roles: AgentWorktreeRole[] = ["claude", "antigravity", "synthesis"];
+  for (const r of roles) {
+    stopPreviewServer(taskId, r);
+  }
+}
+
+/**
+ * Reads a static file directly from the agent's worktree if available.
+ */
+export function readWorktreeStaticFile(
+  taskId: string,
+  role: AgentWorktreeRole,
+  subPath: string = ""
+): { found: boolean; content?: Buffer; contentType?: string } {
+  const worktreePath = getAgentWorktreePath(taskId, role);
+  if (!fs.existsSync(worktreePath)) {
+    return { found: false };
+  }
+
+  let cleanSubPath = subPath.replace(/^\/+/, "");
+  if (!cleanSubPath) {
+    // Check typical entrypoints
+    const candidates = [
+      "index.html",
+      "public/index.html",
+      "src/index.html",
+      "dist/index.html",
+      "out/index.html",
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(path.join(worktreePath, c))) {
+        cleanSubPath = c;
+        break;
+      }
+    }
+  }
+
+  const targetFile = path.join(worktreePath, cleanSubPath);
+
+  // Security check: ensure path does not escape worktree
+  if (!targetFile.startsWith(worktreePath)) {
+    return { found: false };
+  }
+
+  if (fs.existsSync(targetFile) && fs.statSync(targetFile).isFile()) {
+    const content = fs.readFileSync(targetFile);
+    const ext = path.extname(targetFile).toLowerCase();
+
+    const mimeMap: Record<string, string> = {
+      ".html": "text/html; charset=utf-8",
+      ".js": "application/javascript; charset=utf-8",
+      ".mjs": "application/javascript; charset=utf-8",
+      ".css": "text/css; charset=utf-8",
+      ".json": "application/json; charset=utf-8",
+      ".svg": "image/svg+xml",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+      ".ico": "image/x-icon",
+    };
+
+    return {
+      found: true,
+      content,
+      contentType: mimeMap[ext] || "application/octet-stream",
+    };
+  }
+
+  return { found: false };
+}

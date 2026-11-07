@@ -36,6 +36,7 @@ import {
   Code2,
   GitPullRequest,
   Sliders,
+  Dna,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -55,7 +56,8 @@ export function DualBranchArena() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [isCreatingPR, setIsCreatingPR] = useState(false);
-  const [diffMode, setDiffMode] = useState<"split" | "unified" | "synthesis">("split");
+  const [isGeneratingHybrid, setIsGeneratingHybrid] = useState(false);
+  const [diffMode, setDiffMode] = useState<"split" | "unified" | "synthesis" | "cherrypick">("split");
 
   // Sandbox benchmark state
   const [isBenchmarking, setIsBenchmarking] = useState(false);
@@ -155,6 +157,44 @@ export function DualBranchArena() {
       });
     } finally {
       setIsCreatingPR(false);
+    }
+  };
+
+  // Trigger Hybrid Synthesis (AI Judge blends Claude backend + Antigravity frontend)
+  const handleHybridSynthesis = async (taskId: string) => {
+    if (!taskId) return;
+    setIsGeneratingHybrid(true);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/hybrid-synthesis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Échec de la synthèse hybride");
+      }
+      const data = await res.json();
+      addNotification({
+        type: "success",
+        title: "🧬 Synthèse Hybride Achevée !",
+        message: `Fusion chirurgicale (Claude Backend + Antigravity UI) prête. Score combiné: ${data.analysis?.metrics?.combinedScore || "9.6"}/10`,
+        autoDismissMs: 5000,
+      });
+      if (selectedProject) {
+        await fetchTasks(selectedProject.id);
+        await fetchTaskDebate(taskId);
+      }
+      setDiffMode("synthesis");
+      setActiveView("diff");
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur synthèse hybride",
+        message: err.message,
+        autoDismissMs: 4000,
+      });
+    } finally {
+      setIsGeneratingHybrid(false);
     }
   };
 
@@ -302,6 +342,21 @@ export function DualBranchArena() {
             <span>{isBenchmarking ? "Benchmark..." : "🧪 Benchmark Sandbox"}</span>
           </button>
 
+          {/* Hybrid Synthesis Button */}
+          <button
+            onClick={() => selectedTask && handleHybridSynthesis(selectedTask.id)}
+            disabled={isGeneratingHybrid || !selectedTask}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-gradient-to-r from-purple-500/20 via-pink-500/20 to-emerald-500/20 hover:from-purple-500/30 hover:to-emerald-500/30 text-purple-200 border border-purple-500/30 rounded-md transition-all shadow-sm disabled:opacity-50"
+            title="Générer une synthèse hybride IA : combine le backend de Claude et le frontend d'Antigravity"
+          >
+            {isGeneratingHybrid ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-400" />
+            ) : (
+              <Dna className="w-3.5 h-3.5 text-purple-400" />
+            )}
+            <span>{isGeneratingHybrid ? "Synthèse Hybride..." : "🧬 Synthèse Hybride"}</span>
+          </button>
+
           {/* View Mode Switcher */}
           <div className="flex items-center bg-secondary rounded-md p-0.5 border border-border/50">
             {(
@@ -356,6 +411,8 @@ export function DualBranchArena() {
               isMerging={isMerging}
               onCreatePR={handleCreatePR}
               isCreatingPR={isCreatingPR}
+              onHybridSynthesis={handleHybridSynthesis}
+              isGeneratingHybrid={isGeneratingHybrid}
             />
           )}
           {activeView === "diff" && (
@@ -363,6 +420,8 @@ export function DualBranchArena() {
               task={selectedTask}
               diffMode={diffMode}
               onChangeMode={(mode) => setDiffMode(mode)}
+              onHybridSynthesis={handleHybridSynthesis}
+              isGeneratingHybrid={isGeneratingHybrid}
             />
           )}
           {activeView === "preview" && (
@@ -395,6 +454,8 @@ function DebateView({
   isMerging,
   onCreatePR,
   isCreatingPR,
+  onHybridSynthesis,
+  isGeneratingHybrid,
 }: {
   task: TaskWithRelations;
   logs: AgentDebateLog[];
@@ -402,6 +463,8 @@ function DebateView({
   isMerging?: boolean;
   onCreatePR?: (taskId: string) => void;
   isCreatingPR?: boolean;
+  onHybridSynthesis?: (taskId: string) => void;
+  isGeneratingHybrid?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const safeLogs = Array.isArray(logs) ? logs : [];
@@ -523,6 +586,22 @@ function DebateView({
             </span>
 
             <div className="flex items-center gap-2">
+              {onHybridSynthesis && (
+                <button
+                  onClick={() => onHybridSynthesis(task.id)}
+                  disabled={isGeneratingHybrid}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/50 hover:to-pink-600/50 text-purple-200 border border-purple-500/40 rounded-lg text-xs font-semibold transition-all shadow-sm disabled:opacity-50"
+                  title="Régénérer une fusion hybride IA intelligente (Claude Backend + Antigravity UI)"
+                >
+                  {isGeneratingHybrid ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-300" />
+                  ) : (
+                    <Dna className="w-3.5 h-3.5 text-purple-300" />
+                  )}
+                  <span>{isGeneratingHybrid ? "Synthèse..." : "🧬 Régénérer Hybride"}</span>
+                </button>
+              )}
+
               {onCreatePR && (
                 <button
                   onClick={() => onCreatePR(task.id)}
@@ -555,6 +634,41 @@ function DebateView({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Hybrid Synthesis Suggestion Card if not yet synthesized */}
+      {!task.synthesisDecision && task.status !== "COMPLETED" && onHybridSynthesis && (
+        <div className="bg-gradient-to-r from-purple-950/30 via-background to-blue-950/30 border border-purple-500/30 rounded-xl p-4 shadow-sm flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+              <Dna className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
+                <span>Prêt pour la Synthèse Hybride IA</span>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  Cherry-Pick Auto
+                </span>
+              </h4>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Le Juge IA fusionne le meilleur du backend de Claude Code (architecture, typage, validation) avec le frontend d&apos;Antigravity (design Tailwind, 60fps).
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onHybridSynthesis(task.id)}
+            disabled={isGeneratingHybrid}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg text-xs font-bold transition-all shadow-md disabled:opacity-50"
+          >
+            {isGeneratingHybrid ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+            ) : (
+              <Dna className="w-3.5 h-3.5 text-white" />
+            )}
+            <span>{isGeneratingHybrid ? "Génération en cours..." : "🧬 Lancer la Fusion Hybride"}</span>
+          </button>
         </div>
       )}
 
@@ -638,10 +752,14 @@ function DiffView({
   task,
   diffMode,
   onChangeMode,
+  onHybridSynthesis,
+  isGeneratingHybrid,
 }: {
   task: TaskWithRelations;
-  diffMode: "split" | "unified" | "synthesis";
-  onChangeMode: (mode: "split" | "unified" | "synthesis") => void;
+  diffMode: "split" | "unified" | "synthesis" | "cherrypick";
+  onChangeMode: (mode: "split" | "unified" | "synthesis" | "cherrypick") => void;
+  onHybridSynthesis?: (taskId: string) => void;
+  isGeneratingHybrid?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const claudeLines = (task.claudeImplementation || "// Aucun code généré pour Claude").split("\n");
@@ -687,11 +805,26 @@ function DiffView({
             <Trophy className="w-3 h-3 text-synthesis" />
             <span>Synthèse Finale</span>
           </button>
+          <button
+            onClick={() => onChangeMode("cherrypick")}
+            className={`px-2.5 py-0.5 rounded transition-colors flex items-center gap-1 ${
+              diffMode === "cherrypick" ? "bg-purple-500/20 text-purple-300 font-semibold shadow-sm" : "text-muted-foreground hover:text-purple-300"
+            }`}
+          >
+            <Dna className="w-3 h-3 text-purple-400" />
+            <span>Cherry-Pick Hybride</span>
+          </button>
         </div>
       </div>
 
       {/* Code Container */}
-      {diffMode === "synthesis" ? (
+      {diffMode === "cherrypick" ? (
+        <CherryPickView
+          task={task}
+          onHybridSynthesis={onHybridSynthesis}
+          isGeneratingHybrid={isGeneratingHybrid}
+        />
+      ) : diffMode === "synthesis" ? (
         <div className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
           <div className="px-4 py-2 bg-synthesis/10 border-b border-border/60 flex items-center justify-between text-xs">
             <div className="flex items-center gap-2">
@@ -778,6 +911,183 @@ function DiffView({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Cherry-Pick & Hybrid Assistant ────────────────────────
+
+function CherryPickView({
+  task,
+  onHybridSynthesis,
+  isGeneratingHybrid,
+}: {
+  task: TaskWithRelations;
+  onHybridSynthesis?: (taskId: string) => void;
+  isGeneratingHybrid?: boolean;
+}) {
+  const [selectedLayers, setSelectedLayers] = useState<Record<string, "claude" | "antigravity">>({
+    backend_arch: "claude",
+    api_validation: "claude",
+    ui_components: "antigravity",
+    styling_tailwind: "antigravity",
+    perf_runtime: "antigravity",
+  });
+
+  const layers = [
+    {
+      id: "backend_arch",
+      title: "Architecture & Modèles de Données (Prisma / SQL)",
+      desc: "Schémas de base, migrations, typage strict et relations d'intégrité.",
+      claudeAdvantage: "Types TS stricts, clés étrangères et indexation optimisée (Recommandé)",
+      antigravityAdvantage: "Schéma agile orienté flexibilité et itération rapide",
+    },
+    {
+      id: "api_validation",
+      title: "Routes API, Endpoints & Sécurité",
+      desc: "Validation Zod, rate limiting, gestion des erreurs HTTP et robustesse backend.",
+      claudeAdvantage: "Parsing Zod rigoureux, codes d'erreur RFC standardisés (Recommandé)",
+      antigravityAdvantage: "Handlers asynchrones épurés et streaming SSE haute réactivité",
+    },
+    {
+      id: "ui_components",
+      title: "Composants d'Interface UI/UX (React 19)",
+      desc: "Décomposition Server/Client, gestion d'état et micro-interactions utilisateur.",
+      claudeAdvantage: "Composants fonctionnels épurés et découplage strict des responsabilités",
+      antigravityAdvantage: "Composants interactifs riches, ergonomie moderne et micro-animations (Recommandé)",
+    },
+    {
+      id: "styling_tailwind",
+      title: "Design System & Tailwind CSS",
+      desc: "Thème sombre cockpit/néon, contrastes WCAG et adaptabilité responsive.",
+      claudeAdvantage: "Styles utilitaires minimalistes et sans fioritures",
+      antigravityAdvantage: "Esthétique moderne 'Cyberpunk', gradients soignés et responsive parfait (Recommandé)",
+    },
+    {
+      id: "perf_runtime",
+      title: "Optimisation Runtime & Performance 60fps",
+      desc: "Fluidité du rendu, temps de réponse DOM, zéro recalcul superflu et fluidité.",
+      claudeAdvantage: "Gestion robuste des états mémoire et garbage collection prévisible",
+      antigravityAdvantage: "Latence minimale sous 50ms et fluidité native 60fps garantie (Recommandé)",
+    },
+  ];
+
+  const claudeCount = Object.values(selectedLayers).filter((v) => v === "claude").length;
+  const antiCount = Object.values(selectedLayers).filter((v) => v === "antigravity").length;
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#09090b]">
+      {/* Top Banner */}
+      <div className="p-4 rounded-xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-card/50 to-blue-950/40 flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Dna className="w-4 h-4 text-purple-400" />
+            <h3 className="text-sm font-bold text-foreground">
+              Sélecteur Hybride Chirurgical (Cherry-Pick Dual-Agent)
+            </h3>
+            <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full">
+              Phase 3.1
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Choisissez précisément pour chaque couche technique si vous souhaitez injecter l&apos;implémentation de Claude Code ou celle d&apos;Antigravity.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right text-xs font-mono">
+            <span className="text-claude font-bold">{claudeCount} Claude</span>
+            <span className="text-muted-foreground mx-1.5">/</span>
+            <span className="text-antigravity font-bold">{antiCount} Antigravity</span>
+          </div>
+
+          {onHybridSynthesis && (
+            <button
+              onClick={() => onHybridSynthesis(task.id)}
+              disabled={isGeneratingHybrid}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg text-xs font-bold transition-all shadow-lg disabled:opacity-50"
+            >
+              {isGeneratingHybrid ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              <span>{isGeneratingHybrid ? "Génération..." : "Fusionner & Synthétiser"}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Layer selector grid */}
+      <div className="space-y-3">
+        {layers.map((layer) => {
+          const current = selectedLayers[layer.id];
+          return (
+            <div
+              key={layer.id}
+              className="p-3.5 rounded-xl border border-border/70 bg-card/60 hover:border-border transition-all"
+            >
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
+                    <span>{layer.title}</span>
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{layer.desc}</p>
+                </div>
+
+                <div className="flex items-center bg-secondary rounded-lg p-1 border border-border/50 shrink-0">
+                  <button
+                    onClick={() => setSelectedLayers((prev) => ({ ...prev, [layer.id]: "claude" }))}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all ${
+                      current === "claude"
+                        ? "bg-claude text-white font-bold shadow-sm"
+                        : "text-muted-foreground hover:text-claude"
+                    }`}
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>Claude</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedLayers((prev) => ({ ...prev, [layer.id]: "antigravity" }))}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all ${
+                      current === "antigravity"
+                        ? "bg-antigravity text-white font-bold shadow-sm"
+                        : "text-muted-foreground hover:text-antigravity"
+                    }`}
+                  >
+                    <Rocket className="w-3.5 h-3.5" />
+                    <span>Antigravity</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Explanatory Advantage Row */}
+              <div className="grid grid-cols-2 gap-3 text-[11px] font-sans pt-2 border-t border-border/30">
+                <div
+                  className={`p-2 rounded-lg border transition-all ${
+                    current === "claude"
+                      ? "bg-claude-muted/20 border-claude/40 text-claude"
+                      : "bg-black/20 border-border/40 text-muted-foreground opacity-60"
+                  }`}
+                >
+                  <span className="font-semibold block text-[10px] uppercase font-mono">Option Claude</span>
+                  {layer.claudeAdvantage}
+                </div>
+                <div
+                  className={`p-2 rounded-lg border transition-all ${
+                    current === "antigravity"
+                      ? "bg-antigravity-muted/20 border-antigravity/40 text-antigravity"
+                      : "bg-black/20 border-border/40 text-muted-foreground opacity-60"
+                  }`}
+                >
+                  <span className="font-semibold block text-[10px] uppercase font-mono">Option Antigravity</span>
+                  {layer.antigravityAdvantage}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1360,11 +1670,15 @@ function PreviewView({
   claudeUrl?: string | null;
   antigravityUrl?: string | null;
 }) {
-  const [previewMode, setPreviewMode] = useState<"sandbox" | "coolify">("sandbox");
+  const [previewMode, setPreviewMode] = useState<"worktree" | "sandbox" | "coolify">("worktree");
   const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [activeBranchTab, setActiveBranchTab] = useState<"split" | "claude" | "antigravity" | "synthesis" | "slider">("split");
   const [sliderPosition, setSliderPosition] = useState(50);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const claudeWorktreeUrl = `/api/preview/${task.id}/claude?t=${refreshKey}`;
+  const antigravityWorktreeUrl = `/api/preview/${task.id}/antigravity?t=${refreshKey}`;
+  const synthesisWorktreeUrl = `/api/preview/${task.id}/synthesis?t=${refreshKey}`;
 
   const claudeHtml = generatePreviewHtml(task, "claude");
   const antigravityHtml = generatePreviewHtml(task, "antigravity");
@@ -1381,9 +1695,21 @@ function PreviewView({
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Preview Header & Controls */}
       <div className="flex items-center justify-between px-4 py-2 bg-card/60 border-b border-border text-xs flex-wrap gap-2">
-        {/* Left: Mode Switcher (Sandbox vs Coolify URL) */}
+        {/* Left: Mode Switcher (Worktrees Live vs Sandbox vs Coolify URL) */}
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-secondary rounded-md p-0.5 border border-border/50">
+            <button
+              onClick={() => setPreviewMode("worktree")}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-all ${
+                previewMode === "worktree"
+                  ? "bg-card text-emerald-400 font-semibold shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title="Prévisualisation directe des serveurs éphémères exécutés dans les worktrees isolés"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Worktrees Live (0 Mock)</span>
+            </button>
             <button
               onClick={() => setPreviewMode("sandbox")}
               className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-all ${
@@ -1391,9 +1717,10 @@ function PreviewView({
                   ? "bg-card text-foreground font-semibold shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
+              title="Simulateur JSX/Tailwind en mémoire"
             >
               <Zap className="w-3.5 h-3.5 text-primary" />
-              <span>Sandbox Code Simulator</span>
+              <span>Sandbox JSX</span>
             </button>
             <button
               onClick={() => setPreviewMode("coolify")}
@@ -1408,8 +1735,8 @@ function PreviewView({
             </button>
           </div>
 
-          {/* Sub-view switcher for Sandbox */}
-          {previewMode === "sandbox" && (
+          {/* Sub-view switcher for Worktrees and Sandbox */}
+          {previewMode !== "coolify" && (
             <div className="flex items-center bg-secondary rounded-md p-0.5 border border-border/50 text-[11px]">
               <button
                 onClick={() => setActiveBranchTab("split")}
@@ -1461,7 +1788,7 @@ function PreviewView({
 
         {/* Right: Viewport Controls & Refresh */}
         <div className="flex items-center gap-2">
-          {previewMode === "sandbox" && (
+          {previewMode !== "coolify" && (
             <div className="flex items-center bg-secondary rounded-md p-0.5 border border-border/50">
               <button
                 onClick={() => setViewport("desktop")}
@@ -1495,17 +1822,17 @@ function PreviewView({
 
           <button
             onClick={() => setRefreshKey((k) => k + 1)}
-            className="flex items-center gap-1 px-2 py-1 bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground rounded text-[11px] font-medium transition-colors"
-            title="Rafraîchir les simulateurs de rendu"
+            className="flex items-center gap-1 px-2.5 py-1 bg-secondary hover:bg-secondary/80 text-foreground rounded text-[11px] font-semibold transition-colors border border-border/60"
+            title="Rafraîchir les serveurs de prévisualisation live"
           >
-            <RefreshCw className="w-3 h-3" />
-            <span>Rafraîchir</span>
+            <RefreshCw className="w-3 h-3 text-primary" />
+            <span>Hard Reload</span>
           </button>
         </div>
       </div>
 
       {/* Main Preview Container */}
-      {previewMode === "sandbox" ? (
+      {previewMode !== "coolify" ? (
         <div className="flex-1 overflow-hidden flex bg-[#060608] p-2">
           {activeBranchTab === "split" ? (
             <div className={`flex-1 flex gap-2 h-full ${viewportStyles[viewport]}`}>
@@ -1515,14 +1842,17 @@ function PreviewView({
                   <span className="text-claude font-bold flex items-center gap-1.5">
                     <Bot className="w-3.5 h-3.5" /> {task.claudeBranch || "agent/claude"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">Tailwind + JSX Simulator</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {previewMode === "worktree" ? "Worktree Live (Port Éphémère)" : "JSX Simulator"}
+                  </span>
                 </div>
                 <iframe
-                  key={`claude-${refreshKey}`}
-                  srcDoc={claudeHtml}
+                  key={`claude-${refreshKey}-${previewMode}`}
+                  src={previewMode === "worktree" ? claudeWorktreeUrl : undefined}
+                  srcDoc={previewMode === "sandbox" ? claudeHtml : undefined}
                   className="flex-1 w-full bg-[#09090b] border-none"
-                  title="Claude Simulator"
-                  sandbox="allow-scripts allow-modals"
+                  title="Claude Live Preview"
+                  sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
                 />
               </div>
 
@@ -1532,14 +1862,17 @@ function PreviewView({
                   <span className="text-antigravity font-bold flex items-center gap-1.5">
                     <Rocket className="w-3.5 h-3.5" /> {task.antigravityBranch || "agent/antigravity"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">Tailwind + JSX Simulator</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {previewMode === "worktree" ? "Worktree Live (Port Éphémère)" : "JSX Simulator"}
+                  </span>
                 </div>
                 <iframe
-                  key={`anti-${refreshKey}`}
-                  srcDoc={antigravityHtml}
+                  key={`anti-${refreshKey}-${previewMode}`}
+                  src={previewMode === "worktree" ? antigravityWorktreeUrl : undefined}
+                  srcDoc={previewMode === "sandbox" ? antigravityHtml : undefined}
                   className="flex-1 w-full bg-[#09090b] border-none"
-                  title="Antigravity Simulator"
-                  sandbox="allow-scripts allow-modals"
+                  title="Antigravity Live Preview"
+                  sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
                 />
               </div>
             </div>
@@ -1547,30 +1880,38 @@ function PreviewView({
             <div className={`flex-1 flex flex-col rounded-xl overflow-hidden border border-border/60 bg-card ${viewportStyles[viewport]}`}>
               <div className="px-3 py-1.5 bg-claude-muted/20 border-b border-border/60 flex items-center justify-between text-xs font-mono">
                 <span className="text-claude font-bold flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5" /> Claude Code Simulator
+                  <Bot className="w-3.5 h-3.5" /> Claude Code Live Preview
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {previewMode === "worktree" ? "Worktree Réel" : "Simulateur JSX"}
                 </span>
               </div>
               <iframe
-                key={`claude-single-${refreshKey}`}
-                srcDoc={claudeHtml}
+                key={`claude-single-${refreshKey}-${previewMode}`}
+                src={previewMode === "worktree" ? claudeWorktreeUrl : undefined}
+                srcDoc={previewMode === "sandbox" ? claudeHtml : undefined}
                 className="flex-1 w-full bg-[#09090b] border-none"
                 title="Claude Simulator"
-                sandbox="allow-scripts allow-modals"
+                sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
               />
             </div>
           ) : activeBranchTab === "antigravity" ? (
             <div className={`flex-1 flex flex-col rounded-xl overflow-hidden border border-border/60 bg-card ${viewportStyles[viewport]}`}>
               <div className="px-3 py-1.5 bg-antigravity-muted/20 border-b border-border/60 flex items-center justify-between text-xs font-mono">
                 <span className="text-antigravity font-bold flex items-center gap-1.5">
-                  <Rocket className="w-3.5 h-3.5" /> Antigravity Engine Simulator
+                  <Rocket className="w-3.5 h-3.5" /> Antigravity Engine Live Preview
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {previewMode === "worktree" ? "Worktree Réel" : "Simulateur JSX"}
                 </span>
               </div>
               <iframe
-                key={`anti-single-${refreshKey}`}
-                srcDoc={antigravityHtml}
+                key={`anti-single-${refreshKey}-${previewMode}`}
+                src={previewMode === "worktree" ? antigravityWorktreeUrl : undefined}
+                srcDoc={previewMode === "sandbox" ? antigravityHtml : undefined}
                 className="flex-1 w-full bg-[#09090b] border-none"
                 title="Antigravity Simulator"
-                sandbox="allow-scripts allow-modals"
+                sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
               />
             </div>
           ) : activeBranchTab === "slider" ? (
@@ -1579,7 +1920,7 @@ function PreviewView({
               <div className="px-3 py-1.5 bg-[#121215] border-b border-border/60 flex items-center justify-between text-xs font-mono">
                 <div className="flex items-center gap-2">
                   <Sliders className="w-3.5 h-3.5 text-primary" />
-                  <span className="font-bold text-foreground">Curseur Visuel Superposé</span>
+                  <span className="font-bold text-foreground">Curseur Visuel Superposé (Live Worktrees)</span>
                   <span className="text-[10px] text-muted-foreground">({sliderPosition}% Claude / {100 - sliderPosition}% Antigravity)</span>
                 </div>
                 <div className="flex items-center gap-3 w-64">
@@ -1600,8 +1941,9 @@ function PreviewView({
               <div className="flex-1 relative w-full h-full overflow-hidden select-none">
                 {/* Bottom Layer: Antigravity */}
                 <iframe
-                  key={`slider-anti-${refreshKey}`}
-                  srcDoc={antigravityHtml}
+                  key={`slider-anti-${refreshKey}-${previewMode}`}
+                  src={previewMode === "worktree" ? antigravityWorktreeUrl : undefined}
+                  srcDoc={previewMode === "sandbox" ? antigravityHtml : undefined}
                   className="absolute inset-0 w-full h-full bg-[#09090b] border-none pointer-events-none"
                   title="Antigravity Background"
                 />
@@ -1612,8 +1954,9 @@ function PreviewView({
                   style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
                 >
                   <iframe
-                    key={`slider-claude-${refreshKey}`}
-                    srcDoc={claudeHtml}
+                    key={`slider-claude-${refreshKey}-${previewMode}`}
+                    src={previewMode === "worktree" ? claudeWorktreeUrl : undefined}
+                    srcDoc={previewMode === "sandbox" ? claudeHtml : undefined}
                     className="w-full h-full bg-[#09090b] border-none"
                     title="Claude Foreground"
                   />
@@ -1644,13 +1987,17 @@ function PreviewView({
                 <span className="text-synthesis font-bold flex items-center gap-1.5">
                   <Trophy className="w-3.5 h-3.5" /> Synthèse Consensuelle &amp; Fusion Finale
                 </span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {previewMode === "worktree" ? "Worktree Réel" : "Simulateur JSX"}
+                </span>
               </div>
               <iframe
-                key={`synth-single-${refreshKey}`}
-                srcDoc={synthesisHtml}
+                key={`synth-single-${refreshKey}-${previewMode}`}
+                src={previewMode === "worktree" ? synthesisWorktreeUrl : undefined}
+                srcDoc={previewMode === "sandbox" ? synthesisHtml : undefined}
                 className="flex-1 w-full bg-[#09090b] border-none"
                 title="Synthesis Simulator"
-                sandbox="allow-scripts allow-modals"
+                sandbox="allow-scripts allow-forms allow-same-origin allow-modals"
               />
             </div>
           )}

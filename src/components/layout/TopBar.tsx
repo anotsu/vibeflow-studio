@@ -17,9 +17,12 @@ import {
   CircleDot,
   Play,
   Loader2,
+  Sliders,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
+import { TokenSavingsBadge } from "@/components/dashboard/TokenSavingsTracker";
+import { DaemonControllerModal } from "@/components/dashboard/DaemonControllerModal";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
@@ -31,6 +34,7 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
     useProjectStore();
   const { setSelectedProjectId, notifications, addNotification } = useUIStore();
   const [isTicking, setIsTicking] = useState(false);
+  const [daemonModalOpen, setDaemonModalOpen] = useState(false);
 
   const isAuto = selectedProject?.mode === "AUTO";
 
@@ -209,8 +213,20 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
                 <span className="hidden sm:inline">Exécuter Cycle</span>
               </button>
             )}
+
+            {/* Daemon Autonomy Controller Settings */}
+            <button
+              onClick={() => setDaemonModalOpen(true)}
+              className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border border-border/50"
+              title="Paramètres d'autonomie et limites de sécurité du Daemon 24/7"
+            >
+              <Sliders className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
+
+        {/* Token Savings Tracker (0€ Cost) */}
+        <TokenSavingsBadge />
 
         {/* Assistance CLIs Pro */}
         <button
@@ -242,6 +258,12 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
           <Settings className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Daemon 24/7 Autonomy Controller Modal */}
+      <DaemonControllerModal
+        isOpen={daemonModalOpen}
+        onClose={() => setDaemonModalOpen(false)}
+      />
     </header>
   );
 }
