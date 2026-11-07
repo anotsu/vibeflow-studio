@@ -16,7 +16,7 @@ updated: 2026-11-07
 
 ## 🧭 Navigation Rapide du Coffre (Map of Content)
 
-- 🚀 **Stratégie & Roadmap** : [[01_Master_Roadmap|Master Roadmap Industrielle (4 Phases)]]
+- 🚀 **Stratégie & Roadmap** : [[01_Master_Roadmap|Master Roadmap Industrielle (8 Phases)]]
 - 🏗️ **Architecture & Infra** : [[02_Architecture_Systeme|Architecture Système & Dual-Agent Worktrees]]
 - 📌 **Backlog des Tâches** : Dossier [[03_Kanban_Tasks/|03_Kanban_Tasks (Tâches Synchronisées)]]
 - 💬 **Débats d'Architecture** : Dossier [[04_AI_Debates_Logs/|04_AI_Debates_Logs (Transcriptions)]]

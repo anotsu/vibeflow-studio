@@ -1,14 +1,14 @@
 ---
 tags: [vibeflow, roadmap, planning, master]
 project: VibeFlow Studio
-version: 1.0.0-PROD
+version: 2.0.0-PROD
 updated: 2026-11-07
 ---
 
-# 🚀 VibeFlow Studio — Master Roadmap Industrielle (4 Phases)
+# 🚀 VibeFlow Studio — Master Roadmap Industrielle (8 Phases)
 
 > [!NOTE] Philosophie d'Exécution Dual-Agent
-> Chaque action est assignée soit à **Claude Code Pro** (Architecture & Robustesse), soit à **Antigravity CLI** (UI/UX & Challengers Rapides), soit en mode **Dual** pour fusion collective.
+> Chaque action est assignée soit à **Claude Code Pro** (Architecture, Robustesse & Typage), soit à **Antigravity CLI** (UI/UX, 60fps & Challengers Rapides), soit en mode **Dual** pour fusion collective.
 > Aucun mock n'est toléré dans l'architecture finale.
 
 ---
@@ -26,7 +26,7 @@ updated: 2026-11-07
 ### 1.2 Serveurs de Prévisualisation Éphémères pour le Visual Diff Slider (`preview-orchestrator.ts`)
 - **Problème résolu** : Le `DualBranchArena.tsx` a besoin de deux vraies URLs live pour superposer les rendus de `claude-impl` et `antigravity-impl` via `clip-path`.
 - **Actions** :
-  - [x] #task #claude [priority:: critical] Créer `src/lib/preview-orchestrator.ts` qui détecte 2 ports libres (ex: `4001` et `4002`), lance les serveurs de dev de chaque worktree en arrière-plan et expose un reverse-proxy interne (`/api/preview/[taskId]/claude` et `/api/preview/[taskId]/antigravity`).
+  - [x] #task #claude [priority:: critical] Créer `src/lib/preview-orchestrator.ts` qui détecte 2 ports libres (ex: `4100` à `4999`), lance les serveurs de dev de chaque worktree en arrière-plan et expose un reverse-proxy interne (`/api/preview/[taskId]/claude` et `/api/preview/[taskId]/antigravity`).
   - [x] #task #antigravity [priority:: high] Connecter les `<iframe>` du `Visual Diff Overlay Slider` dans `DualBranchArena.tsx` à ces routes dynamiques avec indicateur de chargement et bouton "Hard Reload Preview".
   - [x] #task #claude [priority:: medium] Ajouter un "Auto-Sleep" qui stoppe les processus de preview après 15 minutes d'inactivité pour économiser la RAM du VPS Coolify.
 
@@ -60,18 +60,18 @@ updated: 2026-11-07
 ### 3.1 Mode "Fusion Hybride / Cherry-Pick Assisté" dans l'Arène (`DualBranchArena.tsx`)
 - **Concept** : Permettre une fusion chirurgicale entre le meilleur code de Claude (Backend/API) et celui d'Antigravity (UI/UX).
 - **Actions** :
-  - [x] #task #antigravity [priority:: high] Ajouter dans `DualBranchArena.tsx` une sélection fichier/couche par couche (cases à cocher dans le Code Diff : "Prendre de Claude" vs "Prendre d'Antigravity").
-  - [x] #task #claude [priority:: high] Ajouter un bouton **"🧬 Synthèse Hybride IA"** où le Juge IA fusionne automatiquement le meilleur des deux branches dans une 3ème branche `synthesis-impl`, vérifie que `tsc --noEmit` passe, et ouvre la PR.
+  - [x] #task #antigravity [priority:: high] Ajouter dans `DualBranchArena.tsx` une sélection couche par couche (`CherryPickView` : Architecture Prisma, API Routes & Sécurité, Composants React 19, Design System Tailwind, Performance 60fps).
+  - [x] #task #claude [priority:: high] Ajouter un bouton **"🧬 Synthèse Hybride IA"** où le Juge IA fusionne automatiquement le meilleur des deux branches dans la 3ème branche `synthesis/solution`, vérifie que `tsc --noEmit` passe, et ouvre la PR.
 
 ### 3.2 Juge IA Équipé de Tests E2E Visuels (Playwright Runner)
 - **Concept** : Le Juge IA teste réellement l'application générée dans un navigateur sans tête.
 - **Actions** :
-  - [ ] #task #claude [priority:: medium] Intégrer un runner Playwright léger qui visite les deux serveurs de preview, capture les erreurs `console.error` runtime, mesure le temps de rendu (LCP) et prend des captures d'écran comparatives.
+  - [ ] #task #claude [priority:: high] Intégrer un runner Playwright léger qui visite les deux serveurs de preview, capture les erreurs `console.error` runtime, mesure le temps de rendu (LCP) et prend des captures d'écran comparatives.
 
 ### 3.3 Widget "Économiseur de Tokens Pro-First" (`TokenSavingsTracker.tsx`)
 - **Concept** : Matérialiser la valeur économique de l'architecture 0€ de token.
 - **Actions** :
-  - [x] #task #antigravity [priority:: medium] Compter le nombre de caractères/tokens échangés dans les CLIs locales et afficher dans `TopBar.tsx` un compteur : *"💰 Économisé ce mois-ci : ~148.60 € (0.00 € facturé via CLIs Pro)"*.
+  - [x] #task #antigravity [priority:: medium] Compter le nombre de caractères/tokens échangés dans les CLIs locales et afficher dans `TopBar.tsx` un compteur : *"💰 Économisé : ~148.60 € (0.00 € facturé via CLIs Pro)"*.
   - [x] #task #antigravity [priority:: medium] Modal interactif avec ROI, barres comparatives par moteur et calcul d'amortissement des abonnements Pro.
 
 ---
@@ -79,3 +79,101 @@ updated: 2026-11-07
 ## 🛡️ PHASE 4 : Sécurité, Daemon Autonome 24/7 & Scalabilité
 - [x] #task #claude [priority:: high] **Hardening de `/api/terminal/execute`** : Filtrage sur liste blanche de commandes sûres (`git`, `node`, `npm`, `npx`, `pnpm`, `ls`, etc.) et isolation.
 - [x] #task #claude [priority:: medium] **Contrôleur du Daemon (`/api/daemon/tick`)** : Ajouter dans la `TopBar.tsx` un interrupteur maître **"🤖 Mode Autonome 24/7 (ON/OFF)"** avec modal de réglage de la fréquence des ticks, limites de tâches et auto-guérison Coolify.
+
+---
+
+## 🔬 PHASE 5 : Tests Visuels E2E & Juge IA Multimodal (Playwright + AI Vision)
+*Objectif : Transformer le Juge IA en véritable testeur automatisé capable de naviguer dans l'UI, d'auditer les performances et de détecter les régressions visuelles.*
+
+### 5.1 Runner Playwright E2E Headless Automatisé (`playwright-runner.ts`)
+- **Concept** : Faire naviguer un navigateur Chromium sans tête sur chaque worktree avant validation de la tâche.
+- **Actions** :
+  - [ ] #task #claude [priority:: critical] Créer `src/lib/playwright-runner.ts` pour visiter automatiquement les serveurs de preview (`/api/preview/[taskId]/claude` vs `/api/preview/[taskId]/antigravity`).
+  - [ ] #task #claude [priority:: high] Détecter et consigner les `console.error`, erreurs de rendu React (Hydration mismatch, unhandled exceptions) et erreurs 404/500 sur les routes dynamiques.
+  - [ ] #task #antigravity [priority:: medium] Afficher un onglet de rapport de tests automatisés dans `DualBranchArena.tsx` avec les logs de console capturés en temps réel.
+
+### 5.2 Analyse Critique Multimodale par Vision IA (Pixel Diff & Review Visuelle)
+- **Concept** : Évaluer l'esthétique et l'accessibilité comme un designer humain expert.
+- **Actions** :
+  - [ ] #task #antigravity [priority:: high] Captures d'écran pleine page Desktop (1920x1080) et Mobile (375x812) pour chaque branche.
+  - [ ] #task #antigravity [priority:: high] Comparaison visuelle pixel par pixel (`pixelmatch`) et injection des images dans le Juge IA Antigravity Vision pour évaluer les débordements CSS, le contraste et l'accessibilité WCAG.
+  - [ ] #task #claude [priority:: medium] Générer une image de diff superposée annotant automatiquement en rouge les zones de conflit visuel.
+
+### 5.3 Métriques Web Vitals & Benchmark LCP/FID/CLS
+- **Concept** : Arbitrer les duels sur des critères objectifs de performance web.
+- **Actions** :
+  - [ ] #task #claude [priority:: medium] Audit automatique de performance : temps de chargement du premier octet (TTFB), Largest Contentful Paint (LCP) et score de stabilité visuelle (CLS) pour chaque branche.
+  - [ ] #task #antigravity [priority:: medium] Intégration de badges de scores Core Web Vitals dans l'en-tête de comparaison de `DualBranchArena.tsx`.
+
+---
+
+## 🌐 PHASE 6 : Multi-Projets Polyglottes & Architecture Tunnels Sécurisés
+*Objectif : Rendre VibeFlow Studio compatible avec tout type de framework et permettre le test instantané sur appareils mobiles réels.*
+
+### 6.1 Prise en Charge Multi-Stacks Polyglottes (Next.js, Vite, FastAPI, Rust)
+- **Concept** : Permettre à VibeFlow d'importer et d'optimiser n'importe quel dépôt GitHub, quel que soit le langage.
+- **Actions** :
+  - [ ] #task #claude [priority:: high] Détection automatique du moteur de build (`Next.js`, `Vite/React`, `Vue/Nuxt`, `SvelteKit`, `FastAPI/Python`, `Rust Axum`).
+  - [ ] #task #claude [priority:: high] Génération dynamique du script de démarrage du serveur de preview éphémère selon la stack détectée (`npm run dev`, `uvicorn`, `cargo watch`).
+  - [ ] #task #antigravity [priority:: medium] Badges de technologie détectée affichés sur la fiche projet dans la TopBar.
+
+### 6.2 Tunnels Éphémères Mobiles (Cloudflare Tunnel / Ngrok / Tailscale)
+- **Concept** : Tester l'application sur un smartphone réel sans configuration DNS ou port-forwarding.
+- **Actions** :
+  - [ ] #task #antigravity [priority:: high] Créer un endpoint `POST /api/preview/[taskId]/tunnel` pour générer un lien public temporaire sécurisé (ex: `https://task-123-preview.trycloudflare.com`).
+  - [ ] #task #antigravity [priority:: medium] Afficher un QR Code interactif dans `DualBranchArena.tsx` permettant au développeur de scanner et tester immédiatement le rendu mobile en conditions réelles.
+  - [ ] #task #claude [priority:: medium] Fermeture automatique du tunnel dès la mise en sommeil du serveur de preview.
+
+### 6.3 Gestionnaire Multi-Tenancy & Espaces de Travail Multiples
+- **Concept** : Orchestrer plusieurs projets en parallèle sans interférence de mémoire ou de ports.
+- **Actions** :
+  - [ ] #task #claude [priority:: high] Isolation étanche des environnements de dev lorsque plusieurs projets sont gérés simultanément dans VibeFlow.
+  - [ ] #task #antigravity [priority:: medium] Vue d'ensemble multi-projets dans le tableau de bord avec statut des daemons respectifs.
+
+---
+
+## 🎙️ PHASE 7 : Interaction Vocale, Cockpit Mobile & Alertes Temps Réel
+*Objectif : Permettre au lead developer de piloter VibeFlow à la voix ou depuis son smartphone avec des alertes intelligentes.*
+
+### 7.1 Contrôle Vocal & Dictée de Spécifications ("Vibe Voice")
+- **Concept** : Dicter des spécifications complexes et déclencher des arbitrages en mains libres.
+- **Actions** :
+  - [ ] #task #antigravity [priority:: high] Intégrer un bouton micro dans la TopBar et dans le chat de brief utilisant la Web Speech API pour dicter les tâches en langage naturel.
+  - [ ] #task #claude [priority:: high] Parseur IA convertissant la transcription vocale en user stories formattées avec critères d'acceptation Gherkin (`Given/When/Then`).
+  - [ ] #task #antigravity [priority:: medium] Synthèse vocale audio résumant la décision du Juge IA lors d'une fin de duel.
+
+### 7.2 Hub de Notifications Développeur (Telegram / Discord / Slack Webhooks)
+- **Concept** : Être alerté en mobilité lorsqu'une PR est prête ou qu'un build Coolify a été guéri.
+- **Actions** :
+  - [ ] #task #claude [priority:: high] Configuration de webhooks Discord et bot Telegram dans `/api/settings`.
+  - [ ] #task #claude [priority:: high] Envoi automatique de notifications enrichies (titre de la tâche, scores de duel, lien de preview, diff résumé).
+  - [ ] #task #antigravity [priority:: medium] Boutons interactifs Telegram/Discord : "✅ Approuver PR", "⚔️ Relancer Duel", "📖 Consulter Note Obsidian".
+
+### 7.3 Dashboard Analytics de Vitesse & Vélocité d'Équipe IA
+- **Concept** : Visualiser la progression et la vélocité de l'ingénierie augmentée.
+- **Actions** :
+  - [ ] #task #antigravity [priority:: medium] Graphiques de progression dans le Cockpit : vélocité hebdomadaire, temps moyen de résolution de tâche (MTTR), ratio de victoires Claude vs Antigravity.
+  - [ ] #task #antigravity [priority:: medium] Projection financière des économies de tokens cumulées sur l'année.
+
+---
+
+## 🧩 PHASE 8 : Marketplace de Briques, Auto-Documentation & Custom Skills
+*Objectif : Capitaliser sur le code produit pour créer un écosystème réutilisable et auto-documenté.*
+
+### 8.1 Boîte à Outils ("Toolbox Store") & Export 1-Clic de Modules
+- **Concept** : Sauvegarder les modules consensuels validés pour les réutiliser dans n'importe quel autre projet en 1 clic.
+- **Actions** :
+  - [ ] #task #antigravity [priority:: high] Possibilité d'exporter n'importe quelle implémentation consensuelle vers la `Toolbox` globale comme module prêt à l'emploi (ex: Auth NextAuth, Stripe Checkout, Dark Mode, etc.).
+  - [ ] #task #claude [priority:: medium] Injection automatique du code et des dépendances associées dans un nouveau projet via `npm install` et copie de templates.
+
+### 8.2 Auto-Génération de Documentation Technique Continue (Obsidian Docs & OpenAPI)
+- **Concept** : Une documentation vivante toujours à jour avec le code réel en production.
+- **Actions** :
+  - [ ] #task #claude [priority:: high] À chaque PR fusionnée sur main, génération automatique de la fiche d'architecture dans `VibeFlow/06_API_Specs/` et mise à jour du `README.md` du dépôt GitHub.
+  - [ ] #task #antigravity [priority:: medium] Génération automatique de diagrammes Mermaid d'architecture basés sur les composants React et relations Prisma réels.
+
+### 8.3 Marketplace de Compétences IA Personnalisées (Custom Skills & Personas)
+- **Concept** : Étendre l'intelligence des agents avec des règles métiers spécialisées.
+- **Actions** :
+  - [ ] #task #claude [priority:: high] Système de "Skills" pluggables pour orienter le débat IA (ex: Skill Sécurité OWASP, Skill SEO & Métadonnées, Skill Accessibilité RGAA/WCAG).
+  - [ ] #task #antigravity [priority:: medium] Éditeur d'instructions de personas dans l'interface permettant de personnaliser le tempérament de chaque agent (ex: Claude "Auditeur Sécurité Paranoïaque" vs Antigravity "Designer Apple Minimaliste").
