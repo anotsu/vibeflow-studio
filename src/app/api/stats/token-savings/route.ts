@@ -54,13 +54,15 @@ export async function GET() {
       }
     }
 
-    // Baseline volume (Worktree checkouts, background git scans, initial repo ingestion)
-    const BASELINE_CLAUDE_TOKENS = 7_200_000;
-    const BASELINE_ANTIGRAVITY_TOKENS = 6_400_000;
+    const hasActivity = debateLogs.length > 0 || tasks.length > 0;
 
     // ~4 chars per token approximation
     const dynamicClaudeTokens = Math.round(claudeChars / 4);
     const dynamicAntigravityTokens = Math.round(antigravityChars / 4);
+
+    // Baseline volume added only when tasks/worktrees have genuinely executed
+    const BASELINE_CLAUDE_TOKENS = hasActivity ? 120_000 : 0;
+    const BASELINE_ANTIGRAVITY_TOKENS = hasActivity ? 80_000 : 0;
 
     const totalClaudeTokens = BASELINE_CLAUDE_TOKENS + dynamicClaudeTokens;
     const totalAntigravityTokens = BASELINE_ANTIGRAVITY_TOKENS + dynamicAntigravityTokens;
@@ -75,7 +77,9 @@ export async function GET() {
 
     // Fixed subscription amortisation (Anthropic Pro ~20$ = ~18.50€ + Google One AI Premium ~20$ = ~18.50€ -> 37.00€/mo)
     const monthlySubscriptionsEur = 37.0;
-    const amortizationRatio = Number((totalSavedEur / monthlySubscriptionsEur).toFixed(2));
+    const amortizationRatio = totalSavedEur > 0
+      ? Number((totalSavedEur / monthlySubscriptionsEur).toFixed(2))
+      : 0;
     const netGainsEur = Number(Math.max(0, totalSavedEur - monthlySubscriptionsEur).toFixed(2));
 
     return NextResponse.json({
@@ -85,6 +89,7 @@ export async function GET() {
       monthlySubscriptionsEur,
       amortizationRatio,
       netGainsEur,
+      hasActivity,
       tokensCount: {
         total: totalTokens,
         claude: totalClaudeTokens,

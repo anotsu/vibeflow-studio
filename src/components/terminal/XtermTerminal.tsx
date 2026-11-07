@@ -32,6 +32,7 @@ export function XtermTerminal({
   const [agentStatus, setAgentStatus] = useState<DetectedAgentStatus | null>(null);
   const terminalHistoryRef = useRef<string>("");
   const sessionIdRef = useRef<string>(`term-${target}-${Date.now()}`);
+  const hasReportedFallbackRef = useRef<boolean>(false);
 
   const sendTerminalInput = (input: string) => {
     if (socketRef.current?.connected) {
@@ -113,16 +114,21 @@ export function XtermTerminal({
 
         // Welcome banner
         term.writeln(`\x1b[1;35m⚡ VibeFlow CloudCLI\x1b[0m [Session: \x1b[36m${target.toUpperCase()}\x1b[0m]`);
-        if (contextPrompt) {
-          term.writeln(`\x1b[2;37mContext: ${contextPrompt}\x1b[0m`);
+        if (target === "claude") {
+          term.writeln(`\x1b[33mSession Claude Code Pro (0€ token)\x1b[0m`);
+          term.writeln(`\x1b[2;37mCommandes utiles : 'claude login', 'claude key <sk-ant-...>', ou tapez votre question.\x1b[0m\r\n`);
+        } else if (target === "antigravity") {
+          term.writeln(`\x1b[35mSession Antigravity CLI — Gemini Pro (0€ token)\x1b[0m`);
+          term.writeln(`\x1b[2;37mCommandes utiles : 'agy login', 'agy token <AIzaSy...>', ou tapez votre directive.\x1b[0m\r\n`);
+        } else {
+          term.writeln(`\x1b[2;37mSession Shell interactif. Tapez 'help' pour la liste des commandes.\x1b[0m\r\n`);
         }
-        term.writeln(`\x1b[2;37mConnecting to backend terminal daemon at ${wsUrl}...\x1b[0m\r\n`);
 
-        // Connect to Socket.IO server
+        // Connect to Socket.IO server (optional local PTY server)
         const socket = io(wsUrl, {
           transports: ["websocket", "polling"],
-          reconnectionAttempts: 5,
-          timeout: 4000,
+          reconnectionAttempts: 2,
+          timeout: 2000,
         });
 
         socketRef.current = socket;
@@ -130,7 +136,7 @@ export function XtermTerminal({
         socket.on("connect", () => {
           if (!isMounted) return;
           setIsConnected(true);
-          term.writeln(`\x1b[32m✔ Connected to CloudCLI backend server.\x1b[0m\r\n`);
+          term.writeln(`\x1b[32m✔ Connecté au serveur PTY natif.\x1b[0m\r\n`);
 
           // Request pty session
           socket.emit("terminal:create", {
@@ -154,16 +160,24 @@ export function XtermTerminal({
           term.writeln(`\r\n\x1b[33m[Process completed]\x1b[0m\r\n`);
         });
 
-        socket.on("connect_error", () => {
-          if (!isMounted) return;
+        const showFallbackPrompt = () => {
+          if (!isMounted || hasReportedFallbackRef.current) return;
+          hasReportedFallbackRef.current = true;
           setIsConnected(false);
-          // Local fallback prompt if WS is not running yet
-          term.writeln(
-            `\x1b[33m[CloudCLI Info] Standalone Mode: Backend PTY daemon unreachable.\x1b[0m\r\n` +
-            `\x1b[36mVibeFlow Interactive Emulator ready.\x1b[0m Tapez vos commandes ci-dessous :\r\n` +
-            `\x1b[32m${target}>\x1b[0m `
-          );
+          term.writeln(`\x1b[36mÉmulateur interactif CloudCLI prêt.\x1b[0m Tapez vos commandes ci-dessous :`);
+          term.write(`\x1b[32m${target}>\x1b[0m `);
+        };
+
+        socket.on("connect_error", () => {
+          showFallbackPrompt();
         });
+
+        // Fast fallback timer if PTY daemon is not active
+        setTimeout(() => {
+          if (!socket.connected) {
+            showFallbackPrompt();
+          }
+        }, 1200);
 
         // User input handling
         let localBuffer = "";

@@ -70,21 +70,29 @@ Les badges d'état sont également propagés en direct via Server-Sent Events (S
 
 ---
 
-## 4. Stratégie Économique "Pro-First" (0€ de Frais API)
+## 4. Stratégie Économique "Pro-First" & Diagnostic Strict des CLIs
 
 ```mermaid
 flowchart TD
-    Prompt[Demande Développeur / Tâche Backlog] --> Router{Détection Session}
-    Router -->|Session Claude Pro active ~/.claude| ClaudeCLI[Claude Code CLI\n0.00 € token]
-    Router -->|Jeton Gemini Pro actif ~/.gemini| AgyCLI[Antigravity CLI agy\n0.00 € token]
+    Prompt[Demande Développeur / Tâche Backlog] --> Router{Détection Session Réelle}
+    Router -->|Session Claude Pro active ~/.claude.json avec tokens| ClaudeCLI[Claude Code CLI\n0.00 € token]
+    Router -->|Jeton Gemini Pro actif settings.json| AgyCLI[Antigravity CLI agy\n0.00 € token]
+    Router -->|Non associé| SetupRequired[Bouton Associer CLIs\nTerminal Émulateur Intégré]
     Router -->|Secours / Fallback| Fallback[Clé API Anthropic / Gemini\nChiffrée AES-256]
 ```
 
+### Diagnostic d'Authentification Strict (Zéro Faux Positif)
+- **Claude Code CLI** : La présence d'un dossier vide `~/.claude` ou du binaire global ne suffit pas à déclarer la session active. Le système inspecte rigoureusement `~/.claude.json` pour vérifier la présence d'un objet `oauthAccount`, d'un `sessionKey` ou de tokens valides. À défaut, le statut affiche explicitement **Non associé (Connexion requise)**.
+- **Antigravity CLI (`agy`)** : Le système vérifie que le fichier `~/.gemini/antigravity-cli/settings.json` contient un champ `geminiApiKey` non vide et valide (> 10 caractères). Sans ce jeton, le statut reste **Non associé (Jeton requis)**.
+- **Terminal CloudCLI Universel** : Le panneau de terminal est désormais monté sur toutes les vues, y compris sur l'écran d'accueil avant création de projet. Le clic sur "Ouvrir terminal" maximise immédiatement la vue xterm.js (80vh) sur l'onglet ciblé (`claude` ou `antigravity`).
+- **Commandes d'association en émulateur** :
+  - `claude login` : Affiche la procédure OAuth officielle ou permet de saisir `claude key sk-ant-...`.
+  - `agy login` : Affiche le lien direct vers Google AI Studio et permet d'associer le jeton avec `agy token AIzaSy...`.
 - Les sessions officielles sont montées via des volumes persistants Coolify :
   - `/root/.claude` ➔ `/home/nextjs/.claude`
   - `/root/.gemini` ➔ `/home/nextjs/.gemini`
 - Même après un rebuild complet de l'image Docker, vos accès Pro restent connectés sans ressaisie de jeton.
-- Le composant `src/components/dashboard/TokenSavingsTracker.tsx` affiche en temps réel les jetons consommés et le montant financier évité (base tarifaire standard API $3 / $15 par million de jetons).
+- Le composant `src/components/dashboard/TokenSavingsTracker.tsx` affiche en temps réel les jetons réellement consommés (partant de 0.00 € en l'absence d'activité réelle).
 
 ---
 

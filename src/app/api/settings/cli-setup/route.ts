@@ -27,34 +27,72 @@ export async function GET() {
       claudeInstalled = true;
       claudeVersion = stdout.trim();
     } catch {
-      // Check if global binary exists in typical paths
-      claudeInstalled =
-        fs.existsSync("/usr/local/bin/claude") ||
-        fs.existsSync(path.join(HOME_DIR, ".npm-global", "bin", "claude"));
-      if (claudeInstalled) claudeVersion = "1.0.x (CLI Globale)";
+      // Check typical binary locations (Linux, Docker, Windows npm global)
+      const isWin = process.platform === "win32";
+      const npmGlobalBin = isWin
+        ? path.join(process.env.APPDATA || "", "npm", "claude.cmd")
+        : path.join(HOME_DIR, ".npm-global", "bin", "claude");
+      const unixBin = "/usr/local/bin/claude";
+      if (fs.existsSync(npmGlobalBin) || fs.existsSync(unixBin)) {
+        claudeInstalled = true;
+        claudeVersion = "1.0.x (CLI Globale)";
+      }
     }
 
+    // Real Claude credentials check (do NOT consider an empty ~/.claude directory as authenticated)
+    let hasClaudeSession = false;
+    let claudeAccountEmail = "";
     const claudeJsonPath = path.join(HOME_DIR, ".claude.json");
-    const claudeDirPath = path.join(HOME_DIR, ".claude");
-    const hasClaudeSession =
-      fs.existsSync(claudeJsonPath) || fs.existsSync(claudeDirPath);
+
+    if (fs.existsSync(claudeJsonPath)) {
+      try {
+        const raw = fs.readFileSync(claudeJsonPath, "utf-8");
+        const json = JSON.parse(raw);
+        if (json.oauthAccount || json.sessionKey || json.primaryApiKey || json.tokens) {
+          hasClaudeSession = true;
+          claudeAccountEmail =
+            json.oauthAccount?.emailAddress || json.oauthAccount?.accountUuid || "";
+        }
+      } catch {}
+    }
+
+    if (!hasClaudeSession) {
+      const claudeConfigPath = path.join(HOME_DIR, ".claude", "config.json");
+      if (fs.existsSync(claudeConfigPath)) {
+        try {
+          const raw = fs.readFileSync(claudeConfigPath, "utf-8");
+          const json = JSON.parse(raw);
+          if (json.oauthAccount || json.sessionKey || json.primaryApiKey) {
+            hasClaudeSession = true;
+          }
+        } catch {}
+      }
+    }
 
     const hasAnthropicEnvKey = Boolean(
-      process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.startsWith("sk-ant")
+      process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim().startsWith("sk-ant")
     );
 
     let claudeStatus: "ready" | "api_fallback" | "setup_required" = "setup_required";
-    let claudeAccountType = "Non connecté";
+    let claudeAccountType = "Non associé";
+    let claudeDetails = "Aucune session active. Cliquez sur 'Ouvrir Terminal' pour exécuter `claude login`.";
 
     if (hasClaudeSession) {
       claudeStatus = "ready";
-      claudeAccountType = "Abonnement Claude Pro (0€ token)";
+      claudeAccountType = claudeAccountEmail
+        ? `Claude Pro (${claudeAccountEmail})`
+        : "Abonnement Claude Pro lié (0€ token)";
+      claudeDetails = "Session Claude Pro authentifiée et persistée.";
     } else if (hasAnthropicEnvKey) {
       claudeStatus = "api_fallback";
       claudeAccountType = "Clé API Anthropic (Fallback)";
-    } else if (claudeInstalled) {
-      claudeStatus = "ready";
-      claudeAccountType = "Claude Code CLI Détecté";
+      claudeDetails = "Clé d'API Anthropic configurée via variable d'environnement.";
+    } else {
+      claudeStatus = "setup_required";
+      claudeAccountType = claudeInstalled ? "CLI Installée (Non connecté)" : "Non associé";
+      claudeDetails = claudeInstalled
+        ? "La CLI est installée mais aucun compte Pro n'est lié. Tapez `claude login` dans le terminal."
+        : "La CLI Claude Code n'est pas installée. Installez-la avec `npm i -g @anthropic-ai/claude-code`.";
     }
 
     // 2. Diagnose Antigravity CLI (`agy`)
@@ -70,10 +108,13 @@ export async function GET() {
         agyInstalled = true;
         agyVersion = stdout.trim();
       } catch {
-        agyInstalled =
-          fs.existsSync("/usr/local/bin/antigravity") ||
-          fs.existsSync("/usr/local/bin/agy");
-        if (agyInstalled) agyVersion = "2.0.0 (CLI Globale)";
+        const unixAgy = "/usr/local/bin/agy";
+        const unixAntigravity = "/usr/local/bin/antigravity";
+        const scriptAgy = path.join(process.cwd(), "scripts", "antigravity-cli.js");
+        if (fs.existsSync(unixAgy) || fs.existsSync(unixAntigravity) || fs.existsSync(scriptAgy)) {
+          agyInstalled = true;
+          agyVersion = "2.0.0 (CLI Runtime)";
+        }
       }
     }
 
@@ -85,31 +126,39 @@ export async function GET() {
     if (fs.existsSync(agyConfigFile)) {
       try {
         const content = JSON.parse(fs.readFileSync(agyConfigFile, "utf-8"));
-        if (content.authenticated || content.geminiApiKey) {
+        if (
+          content.geminiApiKey &&
+          typeof content.geminiApiKey === "string" &&
+          content.geminiApiKey.trim().length > 10
+        ) {
           hasAgySession = true;
-          if (content.geminiApiKey) {
-            agyTokenSnippet = `${content.geminiApiKey.slice(0, 4)}...${content.geminiApiKey.slice(-4)}`;
-          }
+          const cleanKey = content.geminiApiKey.trim();
+          agyTokenSnippet = `${cleanKey.slice(0, 4)}...${cleanKey.slice(-4)}`;
         }
       } catch {}
     }
 
     const hasGeminiEnvKey = Boolean(
-      process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+      (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10) ||
+      (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim().length > 10)
     );
 
     let agyStatus: "ready" | "api_fallback" | "setup_required" = "setup_required";
-    let agyAccountType = "Non connecté";
+    let agyAccountType = "Non associé";
+    let agyDetails = "Jeton Gemini Pro manquant. Renseignez votre jeton gratuit Google AI Studio ci-dessous.";
 
     if (hasAgySession) {
       agyStatus = "ready";
-      agyAccountType = "Compte Google / Gemini Pro (0€ token)";
+      agyAccountType = "Compte Google / Gemini Pro lié (0€ token)";
+      agyDetails = "Jeton Gemini Pro associé dans la configuration Antigravity CLI.";
     } else if (hasGeminiEnvKey) {
       agyStatus = "api_fallback";
       agyAccountType = "Clé Google Gemini API (Env)";
-    } else if (agyInstalled) {
-      agyStatus = "ready";
-      agyAccountType = "Antigravity CLI Activé";
+      agyDetails = "Clé API Gemini configurée via les variables d'environnement.";
+    } else {
+      agyStatus = "setup_required";
+      agyAccountType = agyInstalled ? "CLI Prête (Jeton Requis)" : "Non associé";
+      agyDetails = "Jeton gratuit Google AI Studio requis pour activer Antigravity CLI (0€ token).";
     }
 
     return NextResponse.json({
@@ -117,29 +166,25 @@ export async function GET() {
       claude: {
         installed: claudeInstalled,
         version: claudeVersion,
-        authenticated: hasClaudeSession || claudeStatus === "ready",
+        authenticated: hasClaudeSession || (hasAnthropicEnvKey && claudeStatus === "api_fallback"),
         status: claudeStatus,
         accountType: claudeAccountType,
         hasSessionFile: hasClaudeSession,
         hasApiKey: hasAnthropicEnvKey,
         sessionPath: claudeJsonPath,
-        details: hasClaudeSession
-          ? "Session Claude Pro active et persistée sur le conteneur."
-          : "Session Claude Pro prête à être associée.",
+        details: claudeDetails,
       },
       antigravity: {
         installed: agyInstalled,
         version: agyVersion,
-        authenticated: hasAgySession || agyStatus === "ready",
+        authenticated: hasAgySession || (hasGeminiEnvKey && agyStatus === "api_fallback"),
         status: agyStatus,
         accountType: agyAccountType,
         hasSessionFile: hasAgySession,
         hasApiKey: hasGeminiEnvKey,
         sessionPath: agyConfigFile,
         tokenSnippet: agyTokenSnippet || undefined,
-        details: hasAgySession
-          ? "Jeton Gemini Pro lié à la configuration Antigravity CLI."
-          : "Jeton Google AI / Gemini Pro requis pour activer l'agent Antigravity.",
+        details: agyDetails,
       },
       defaultEngine: "pro_clis",
       serverHome: HOME_DIR,
@@ -161,6 +206,29 @@ export async function POST(request: NextRequest) {
 
     // ── Action 1 : Tester Claude Code Pro en direct ──────────
     if (action === "test_claude") {
+      const claudeJsonPath = path.join(HOME_DIR, ".claude.json");
+      let hasSession = false;
+      if (fs.existsSync(claudeJsonPath)) {
+        try {
+          const raw = fs.readFileSync(claudeJsonPath, "utf-8");
+          const json = JSON.parse(raw);
+          if (json.oauthAccount || json.sessionKey || json.primaryApiKey || json.tokens) {
+            hasSession = true;
+          }
+        } catch {}
+      }
+
+      const hasKey = Boolean(
+        process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim().startsWith("sk-ant")
+      );
+
+      if (!hasSession && !hasKey) {
+        return NextResponse.json({
+          success: false,
+          error: "Claude Code CLI n'est pas encore associé. Ouvrez le terminal et tapez `claude login`, ou enregistrez une clé Anthropic de secours ci-dessous.",
+        });
+      }
+
       const startTime = Date.now();
       const testPrompt = body.prompt || "Réponds en 1 phrase courte pour valider la connectivité de Claude Code.";
 
@@ -183,6 +251,29 @@ export async function POST(request: NextRequest) {
 
     // ── Action 2 : Tester Antigravity CLI Pro en direct ───────
     if (action === "test_antigravity") {
+      const agyConfigFile = path.join(HOME_DIR, ".gemini", "antigravity-cli", "settings.json");
+      let hasAgyKey = false;
+      if (fs.existsSync(agyConfigFile)) {
+        try {
+          const content = JSON.parse(fs.readFileSync(agyConfigFile, "utf-8"));
+          if (content.geminiApiKey && content.geminiApiKey.trim().length > 10) {
+            hasAgyKey = true;
+          }
+        } catch {}
+      }
+
+      const hasEnvKey = Boolean(
+        (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10) ||
+        (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim().length > 10)
+      );
+
+      if (!hasAgyKey && !hasEnvKey) {
+        return NextResponse.json({
+          success: false,
+          error: "Antigravity CLI n'est pas encore associé. Renseignez votre jeton Google AI Studio ci-dessous pour l'activer.",
+        });
+      }
+
       const startTime = Date.now();
       const testPrompt = body.prompt || "Réponds en 1 phrase courte pour valider la connectivité d'Antigravity CLI.";
 

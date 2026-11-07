@@ -208,6 +208,9 @@ export default function DashboardPage() {
           isOpen={showCliSetupWizard}
           onClose={() => setShowCliSetupWizard(false)}
         />
+        {/* Terminal CloudCLI accessible even before project creation */}
+        {cliPanelOpen && <CloudCLI />}
+        {!cliPanelOpen && <CloudCLI />}
       </div>
     );
   }

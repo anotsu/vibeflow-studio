@@ -45,22 +45,22 @@ export interface TokenSavingsData {
 }
 
 const DEFAULT_SAVINGS: TokenSavingsData = {
-  totalSavedEur: 148.6,
+  totalSavedEur: 0.0,
   realCostBilledEur: 0.0,
   netSavingsPercent: 100,
   monthlySubscriptionsEur: 37.0,
-  amortizationRatio: 4.01,
-  netGainsEur: 111.6,
+  amortizationRatio: 0.0,
+  netGainsEur: 0.0,
   tokensCount: {
-    total: 13_600_000,
-    claude: 7_200_000,
-    antigravity: 6_400_000,
+    total: 0,
+    claude: 0,
+    antigravity: 0,
   },
   costsBreakdown: {
-    claudeAvoidedEur: 98.4,
-    antigravityAvoidedEur: 50.2,
+    claudeAvoidedEur: 0.0,
+    antigravityAvoidedEur: 0.0,
   },
-  status: "PRO_FIRST_ACTIVE",
+  status: "PRO_FIRST_READY",
   timestamp: new Date().toISOString(),
 };
 

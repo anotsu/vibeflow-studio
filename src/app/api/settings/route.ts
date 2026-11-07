@@ -18,12 +18,42 @@ export async function GET() {
     });
 
     const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-    const hasClaudeAuth =
-      fs.existsSync(path.join(homeDir, ".claude.json")) ||
-      fs.existsSync(path.join(homeDir, ".claude"));
-    const hasAgyAuth = fs.existsSync(
-      path.join(homeDir, ".gemini", "antigravity-cli", "settings.json")
-    );
+    
+    // Check real Claude session
+    let hasClaudeAuth = false;
+    const claudeJson = path.join(homeDir, ".claude.json");
+    if (fs.existsSync(claudeJson)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(claudeJson, "utf-8"));
+        if (raw.oauthAccount || raw.sessionKey || raw.primaryApiKey || raw.tokens) {
+          hasClaudeAuth = true;
+        }
+      } catch {}
+    }
+
+    // Check real Antigravity session
+    let hasAgyAuth = false;
+    const agyJson = path.join(homeDir, ".gemini", "antigravity-cli", "settings.json");
+    if (fs.existsSync(agyJson)) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(agyJson, "utf-8"));
+        if (raw.geminiApiKey && raw.geminiApiKey.trim().length > 10) {
+          hasAgyAuth = true;
+        }
+      } catch {}
+    }
+
+    // Check installed binaries
+    const isWin = process.platform === "win32";
+    const claudeInstalled =
+      fs.existsSync("/usr/local/bin/claude") ||
+      fs.existsSync(path.join(homeDir, ".npm-global", "bin", "claude")) ||
+      (isWin && fs.existsSync(path.join(process.env.APPDATA || "", "npm", "claude.cmd")));
+
+    const agyInstalled =
+      fs.existsSync("/usr/local/bin/agy") ||
+      fs.existsSync("/usr/local/bin/antigravity") ||
+      fs.existsSync(path.join(process.cwd(), "scripts", "antigravity-cli.js"));
 
     return NextResponse.json({
       hasGithubToken: Boolean(settings?.defaultGithubToken),
@@ -33,8 +63,8 @@ export async function GET() {
       redisUrl: settings?.redisUrl || "redis://localhost:6379",
       autoModeIntervalMs: settings?.autoModeIntervalMs || 300000,
       maxConcurrentTasks: settings?.maxConcurrentTasks || 2,
-      claudeCliInstalled: true,
-      antigravityCliInstalled: true,
+      claudeCliInstalled: Boolean(claudeInstalled),
+      antigravityCliInstalled: Boolean(agyInstalled),
       hasClaudeAuth,
       hasAgyAuth,
       defaultEngine: "pro_clis",

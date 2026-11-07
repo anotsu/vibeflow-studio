@@ -71,15 +71,16 @@ export function CloudCLI() {
     cliPanelOpen,
     activeCliTab,
     cliPanelPosition,
+    cliPanelMaximized,
     setActiveCliTab,
     toggleCliPanel,
     setCliPanelPosition,
+    toggleCliPanelMaximized,
     addNotification,
   } = useUIStore();
 
   const { selectedProject, toolboxItems, deployments } = useProjectStore();
 
-  const [isMaximized, setIsMaximized] = useState(false);
   const [showContextBar, setShowContextBar] = useState(true);
 
   if (!cliPanelOpen) {
@@ -101,8 +102,8 @@ export function CloudCLI() {
 
   const panelClasses =
     cliPanelPosition === "bottom"
-      ? `border-t border-border ${isMaximized ? "h-[75vh]" : "h-80"}`
-      : `border-l border-border w-[480px] ${isMaximized ? "w-[60vw]" : "w-[480px]"}`;
+      ? `border-t border-border ${cliPanelMaximized ? "h-[75vh]" : "h-80"}`
+      : `border-l border-border w-[480px] ${cliPanelMaximized ? "w-[60vw]" : "w-[480px]"}`;
 
   const sharedContext = selectedProject
     ? `Repo: ${selectedProject.githubRepo} | Branch: ${selectedProject.githubDefaultBranch} | Missing Tools: ${missingItems.length} | Coolify: ${lastDeployment?.status || "Idle"}`
@@ -172,11 +173,11 @@ export function CloudCLI() {
           </button>
 
           <button
-            onClick={() => setIsMaximized(!isMaximized)}
+            onClick={toggleCliPanelMaximized}
             className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-            title={isMaximized ? "Réduire" : "Maximiser"}
+            title={cliPanelMaximized ? "Réduire" : "Maximiser"}
           >
-            {isMaximized ? (
+            {cliPanelMaximized ? (
               <Minimize2 className="w-3.5 h-3.5" />
             ) : (
               <Maximize2 className="w-3.5 h-3.5" />

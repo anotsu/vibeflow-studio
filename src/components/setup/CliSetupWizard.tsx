@@ -65,7 +65,7 @@ interface CliDiagnosticData {
 type WizardTab = "diagnostic" | "claude" | "antigravity" | "persistence";
 
 export function CliSetupWizard({ isOpen, onClose }: CliSetupWizardProps) {
-  const { addNotification, setActiveCliTab, setCliPanelOpen } = useUIStore();
+  const { addNotification, setActiveCliTab, setCliPanelOpen, setCliPanelMaximized } = useUIStore();
 
   const [activeTab, setActiveTab] = useState<WizardTab>("diagnostic");
   const [loadingDiag, setLoadingDiag] = useState(false);
@@ -354,11 +354,12 @@ export function CliSetupWizard({ isOpen, onClose }: CliSetupWizardProps) {
   const openTerminalForTab = (tab: "claude" | "antigravity") => {
     setActiveCliTab(tab);
     setCliPanelOpen(true);
+    setCliPanelMaximized(true);
     addNotification({
       type: "info",
       title: "Terminal CloudCLI ouvert",
-      message: `Onglet ${tab.toUpperCase()} prêt pour l'authentification interactive.`,
-      autoDismissMs: 3000,
+      message: `Onglet ${tab.toUpperCase()} activé pour l'authentification.`,
+      autoDismissMs: 3500,
     });
     onClose();
   };

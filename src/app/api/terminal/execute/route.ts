@@ -8,7 +8,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai-provider";
 import { exec } from "child_process";
 import { promisify } from "util";
+import fs from "fs";
+import path from "path";
 import { prisma } from "@/lib/prisma";
+import { encrypt } from "@/lib/utils";
 
 const execAsync = promisify(exec);
 
@@ -42,7 +45,103 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, output: helpText });
     }
 
-    // 2. Claude AI Command
+    // 2. Claude Commands & Login
+    if (
+      lower === "claude login" ||
+      lower === "claude auth" ||
+      (target === "claude" && (lower === "login" || lower === "auth"))
+    ) {
+      const output =
+        `\x1b[1;33m[Claude Code Pro — Liaison de Compte]\x1b[0m\r\n` +
+        `Pour lier votre abonnement Claude Pro (0€ facturation token) :\r\n\r\n` +
+        `  1. Dans votre terminal système hôte, exécutez :\r\n` +
+        `     \x1b[36mclaude login\x1b[0m\r\n` +
+        `     (Suivez le lien d'authentification OAuth dans votre navigateur)\r\n\r\n` +
+        `  2. Ou enregistrez une clé d'API Anthropic de secours directement ici :\r\n` +
+        `     \x1b[32mclaude key sk-ant-api03-...\x1b[0m\r\n`;
+      return NextResponse.json({ success: true, output });
+    }
+
+    if (lower.startsWith("claude key ") || lower.startsWith("claude fallback ")) {
+      const key = command.replace(/^claude\s+(key|fallback)\s+/i, "").trim();
+      if (!key.startsWith("sk-ant")) {
+        return NextResponse.json({
+          success: true,
+          output: `\x1b[31m✖ Format de clé invalide. Une clé Anthropic commence par 'sk-ant-'.\x1b[0m\r\n`,
+        });
+      }
+
+      await prisma.globalSettings.upsert({
+        where: { id: "singleton" },
+        create: { id: "singleton", defaultAnthropicKey: encrypt(key) },
+        update: { defaultAnthropicKey: encrypt(key) },
+      });
+
+      return NextResponse.json({
+        success: true,
+        output:
+          `\x1b[32m✔ Clé Anthropic enregistrée avec succès dans le coffre-fort sécurisé !\x1b[0m\r\n` +
+          `\x1b[36mClaude Code utilisera ce fallback API lorsque le CLI local n'est pas connecté.\x1b[0m\r\n`,
+      });
+    }
+
+    // 3. Antigravity Commands & Login
+    if (
+      lower === "agy login" ||
+      lower === "antigravity login" ||
+      (target === "antigravity" && (lower === "login" || lower === "auth"))
+    ) {
+      const output =
+        `\x1b[1;35m[Google Antigravity CLI (agy) — Liaison Gemini Pro]\x1b[0m\r\n` +
+        `Pour associer votre compte Google / Gemini Pro (100% gratuit, 0€ token) :\r\n\r\n` +
+        `  1. Ouvrez \x1b[34mhttps://aistudio.google.com/app/apikey\x1b[0m dans votre navigateur\r\n` +
+        `  2. Cliquez sur 'Create API Key' (gratuit sans carte bancaire)\r\n` +
+        `  3. Collez votre jeton directement ici avec la commande :\r\n` +
+        `     \x1b[32magy token AIzaSy...\x1b[0m\r\n`;
+      return NextResponse.json({ success: true, output });
+    }
+
+    if (lower.startsWith("agy token ") || lower.startsWith("antigravity token ")) {
+      const token = command.replace(/^(agy|antigravity)\s+token\s+/i, "").trim();
+      if (token.length < 10) {
+        return NextResponse.json({
+          success: true,
+          output: `\x1b[31m✖ Jeton trop court ou invalide. Renseignez un jeton valide Google AI Studio.\x1b[0m\r\n`,
+        });
+      }
+
+      const homeDir = process.env.HOME || process.env.USERPROFILE || "/tmp";
+      const agyDir = path.join(homeDir, ".gemini", "antigravity-cli");
+      const agyFile = path.join(agyDir, "settings.json");
+
+      if (!fs.existsSync(agyDir)) {
+        fs.mkdirSync(agyDir, { recursive: true });
+      }
+
+      fs.writeFileSync(
+        agyFile,
+        JSON.stringify(
+          {
+            geminiApiKey: token,
+            authenticated: true,
+            accountType: "google-gemini-pro",
+            updatedAt: new Date().toISOString(),
+          },
+          null,
+          2
+        ),
+        "utf-8"
+      );
+
+      return NextResponse.json({
+        success: true,
+        output:
+          `\x1b[32m✔ Jeton Gemini Pro enregistré dans ~/.gemini/antigravity-cli/settings.json !\x1b[0m\r\n` +
+          `\x1b[35mAntigravity CLI (agy) est maintenant opérationnel en mode Pro (0€ token).\x1b[0m\r\n`,
+      });
+    }
+
+    // 4. Claude AI Command Prompt
     if (target === "claude" || lower.startsWith("claude ")) {
       const prompt = lower.startsWith("claude ") ? command.slice(7) : command;
       const aiRes = await callAI({
@@ -56,7 +155,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, output, provider: aiRes.provider });
     }
 
-    // 3. Antigravity AI Command
+    // 5. Antigravity AI Command Prompt
     if (target === "antigravity" || lower.startsWith("antigravity ") || lower.startsWith("agy ")) {
       const prompt = lower.startsWith("antigravity ")
         ? command.slice(12)

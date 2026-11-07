@@ -26,6 +26,7 @@ import {
   User,
   ShieldCheck,
   KeyRound,
+  Terminal,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -47,8 +48,16 @@ interface TopBarProps {
 export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const { projects, selectedProject, toggleMode, fetchProjects, toolboxItems } =
     useProjectStore();
-  const { setSelectedProjectId, notifications, addNotification } = useUIStore();
+  const {
+    setSelectedProjectId,
+    notifications,
+    addNotification,
+    setActiveCliTab,
+    setCliPanelOpen,
+    setCliPanelMaximized,
+  } = useUIStore();
   const { user, isAdmin, isAuthenticated, logout, fetchMe } = useAuthStore();
+  const [hasCliAssociated, setHasCliAssociated] = useState(false);
   const [isTicking, setIsTicking] = useState(false);
   const [daemonModalOpen, setDaemonModalOpen] = useState(false);
   const [framingGuideOpen, setFramingGuideOpen] = useState(false);
@@ -61,6 +70,14 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
 
   useEffect(() => {
     fetchMe();
+    fetch("/api/settings/cli-setup")
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.success) {
+          setHasCliAssociated(Boolean(d.claude?.authenticated || d.antigravity?.authenticated));
+        }
+      })
+      .catch(() => {});
   }, [fetchMe]);
 
   useEffect(() => {
@@ -307,12 +324,36 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
         {/* Assistance CLIs Pro */}
         <button
           onClick={onOpenCliSetup}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition-all shadow-sm"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${
+            hasCliAssociated
+              ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
+          }`}
           title="Assistance de configuration Claude Pro & Antigravity CLI (0€)"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <Zap className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">CLIs Pro (0€)</span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              hasCliAssociated ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+            }`}
+          />
+          <Zap className={`w-3.5 h-3.5 ${hasCliAssociated ? "text-emerald-400" : "text-amber-400"}`} />
+          <span className="hidden sm:inline">
+            {hasCliAssociated ? "CLIs Pro (0€)" : "Associer CLIs (0€)"}
+          </span>
+        </button>
+
+        {/* Direct Terminal CloudCLI button */}
+        <button
+          onClick={() => {
+            setActiveCliTab("bash");
+            setCliPanelOpen(true);
+            setCliPanelMaximized(true);
+          }}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-semibold transition-all shadow-sm"
+          title="Ouvrir le terminal interactif CloudCLI"
+        >
+          <Terminal className="w-3.5 h-3.5 text-primary" />
+          <span className="hidden md:inline">Terminal</span>
         </button>
 
         {/* Notifications */}

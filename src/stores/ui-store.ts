@@ -10,10 +10,13 @@ interface UIStore extends UIState {
   setActiveWorkspaceTab: (tab: WorkspaceTab) => void;
 
   // CLI panel
+  cliPanelMaximized: boolean;
   setActiveCliTab: (tab: CliTab) => void;
   toggleCliPanel: () => void;
   setCliPanelOpen: (open: boolean) => void;
   setCliPanelPosition: (position: "bottom" | "right") => void;
+  setCliPanelMaximized: (maximized: boolean) => void;
+  toggleCliPanelMaximized: () => void;
 
   // Sidebar
   toggleSidebar: () => void;
@@ -47,6 +50,7 @@ export const useUIStore = create<UIStore>((set) => ({
   sidebarOpen: true,
   cliPanelOpen: true,
   cliPanelPosition: "bottom",
+  cliPanelMaximized: false,
   selectedProjectId: null,
   notifications: [],
 
@@ -58,6 +62,8 @@ export const useUIStore = create<UIStore>((set) => ({
   toggleCliPanel: () => set((s) => ({ cliPanelOpen: !s.cliPanelOpen })),
   setCliPanelOpen: (open) => set({ cliPanelOpen: open }),
   setCliPanelPosition: (position) => set({ cliPanelPosition: position }),
+  setCliPanelMaximized: (maximized) => set({ cliPanelMaximized: maximized }),
+  toggleCliPanelMaximized: () => set((s) => ({ cliPanelMaximized: !s.cliPanelMaximized })),
 
   // Sidebar
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),

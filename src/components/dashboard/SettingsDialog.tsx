@@ -32,7 +32,7 @@ interface SettingsDialogProps {
 }
 
 export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps) {
-  const { addNotification, setActiveCliTab, setCliPanelOpen } = useUIStore();
+  const { addNotification, setActiveCliTab, setCliPanelOpen, setCliPanelMaximized } = useUIStore();
 
   const [loading, setLoading] = useState(false);
   const [testingGithub, setTestingGithub] = useState(false);
@@ -88,11 +88,12 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
   const openCliForAuth = (tab: "claude" | "antigravity") => {
     setActiveCliTab(tab);
     setCliPanelOpen(true);
+    setCliPanelMaximized(true);
     addNotification({
       type: "info",
       title: tab === "claude" ? "Claude Code CLI activé" : "Antigravity CLI activé",
       message: `Terminal ouvert. Tapez ${tab === "claude" ? "'claude login'" : "'agy login'"} pour associer votre compte.`,
-      autoDismissMs: 5000,
+      autoDismissMs: 4000,
     });
     onClose();
   };
@@ -253,12 +254,20 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
                     <span className="text-xs font-semibold text-claude flex items-center gap-1.5">
                       <Bot className="w-3.5 h-3.5" /> Claude Pro (CLI)
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 font-mono">
-                      @anthropic-ai/claude-code
-                    </span>
+                    {cliInfo.hasClaudeAuth ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Connecté
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 font-medium">
+                        Non associé
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    Connectez votre abonnement Pro directement en navigateur.
+                    {cliInfo.hasClaudeAuth
+                      ? "Session Claude Pro active (0€ token facturé)."
+                      : "Ouvrez le terminal pour exécuter `claude login`."}
                   </p>
                 </div>
                 <button
@@ -278,12 +287,20 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
                     <span className="text-xs font-semibold text-antigravity flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" /> Gemini Pro (Antigravity)
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-mono">
-                      agy v2.0
-                    </span>
+                    {cliInfo.hasAgyAuth ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium flex items-center gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Connecté
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 font-medium">
+                        Non associé
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    Gratuit via Google AI Studio ou votre compte Gemini Pro.
+                    {cliInfo.hasAgyAuth
+                      ? "Jeton Gemini Pro lié à Antigravity CLI (0€ token)."
+                      : "Jeton gratuit Google AI Studio requis (0€)."}
                   </p>
                 </div>
                 <button
