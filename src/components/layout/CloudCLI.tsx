@@ -228,6 +228,8 @@ export function CloudCLI() {
         </span>
         {[
           { label: "⚡ Statut CLIs Pro", cmd: "agy -p 'ping' && claude --version" },
+          { label: "🔑 Claude Login", cmd: "claude login" },
+          { label: "🔑 Antigravity Login", cmd: "agy login" },
           { label: "📊 Git status", cmd: "git status" },
           { label: "📦 Dépendances", cmd: "npm list --depth=0" },
           { label: "🧪 Tests unitaires", cmd: "npm test" },

@@ -22,14 +22,16 @@ import {
   Terminal,
   ExternalLink,
   Lock,
+  Zap,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 
 interface SettingsDialogProps {
   onClose: () => void;
+  onOpenCliSetup?: () => void;
 }
 
-export function SettingsDialog({ onClose }: SettingsDialogProps) {
+export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps) {
   const { addNotification, setActiveCliTab, setCliPanelOpen } = useUIStore();
 
   const [loading, setLoading] = useState(false);
@@ -294,6 +296,20 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
                 </button>
               </div>
             </div>
+
+            {onOpenCliSetup && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenCliSetup();
+                }}
+                className="w-full mt-2 py-2 px-3 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
+              >
+                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Ouvrir l&apos;Assistance Complète de Configuration CLIs Pro (Diagnostic & Tests)</span>
+              </button>
+            )}
           </div>
 
           {/* SECTION 2: OPTIONAL API KEYS */}

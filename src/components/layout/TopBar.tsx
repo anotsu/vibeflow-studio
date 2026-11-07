@@ -23,9 +23,10 @@ import { useUIStore } from "@/stores/ui-store";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
+  onOpenCliSetup?: () => void;
 }
 
-export function TopBar({ onOpenSettings }: TopBarProps) {
+export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const { projects, selectedProject, toggleMode, fetchProjects } =
     useProjectStore();
   const { setSelectedProjectId, notifications, addNotification } = useUIStore();
@@ -210,6 +211,17 @@ export function TopBar({ onOpenSettings }: TopBarProps) {
             )}
           </div>
         )}
+
+        {/* Assistance CLIs Pro */}
+        <button
+          onClick={onOpenCliSetup}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition-all shadow-sm"
+          title="Assistance de configuration Claude Pro & Antigravity CLI (0€)"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <Zap className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden sm:inline">CLIs Pro (0€)</span>
+        </button>
 
         {/* Notifications */}
         <button className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">

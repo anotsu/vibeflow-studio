@@ -24,6 +24,7 @@ import { useUIStore } from "@/stores/ui-store";
 import type { WorkspaceTab } from "@/types";
 import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog";
 import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
+import { CliSetupWizard } from "@/components/setup/CliSetupWizard";
 
 const WORKSPACE_TABS: Array<{
   id: WorkspaceTab;
@@ -71,6 +72,7 @@ export default function DashboardPage() {
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showCliSetupWizard, setShowCliSetupWizard] = useState(false);
 
   // Initial load
   useEffect(() => {
@@ -145,7 +147,10 @@ export default function DashboardPage() {
   if (projects.length === 0 && !loading) {
     return (
       <div className="h-screen flex flex-col bg-background">
-        <TopBar onOpenSettings={() => setShowSettingsDialog(true)} />
+        <TopBar
+          onOpenSettings={() => setShowSettingsDialog(true)}
+          onOpenCliSetup={() => setShowCliSetupWizard(true)}
+        />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
@@ -173,8 +178,15 @@ export default function DashboardPage() {
           <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />
         )}
         {showSettingsDialog && (
-          <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+          <SettingsDialog
+            onClose={() => setShowSettingsDialog(false)}
+            onOpenCliSetup={() => setShowCliSetupWizard(true)}
+          />
         )}
+        <CliSetupWizard
+          isOpen={showCliSetupWizard}
+          onClose={() => setShowCliSetupWizard(false)}
+        />
       </div>
     );
   }
@@ -185,7 +197,10 @@ export default function DashboardPage() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Top Bar */}
-      <TopBar onOpenSettings={() => setShowSettingsDialog(true)} />
+      <TopBar
+        onOpenSettings={() => setShowSettingsDialog(true)}
+        onOpenCliSetup={() => setShowCliSetupWizard(true)}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
@@ -248,8 +263,17 @@ export default function DashboardPage() {
 
       {/* Global Settings Dialog */}
       {showSettingsDialog && (
-        <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
+        <SettingsDialog
+          onClose={() => setShowSettingsDialog(false)}
+          onOpenCliSetup={() => setShowCliSetupWizard(true)}
+        />
       )}
+
+      {/* Pro CLIs Setup & Diagnostics Wizard */}
+      <CliSetupWizard
+        isOpen={showCliSetupWizard}
+        onClose={() => setShowCliSetupWizard(false)}
+      />
     </div>
   );
 }
