@@ -23,8 +23,10 @@ import {
   ExternalLink,
   Lock,
   Zap,
+  Server,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
+import { SshHostsManager } from "@/components/settings/SshHostsManager";
 
 interface SettingsDialogProps {
   onClose: () => void;
@@ -38,6 +40,7 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
   const [testingGithub, setTestingGithub] = useState(false);
   const [testingCoolify, setTestingCoolify] = useState(false);
   const [testingClaude, setTestingClaude] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"general" | "ssh">("general");
 
   const [cliInfo, setCliInfo] = useState<{
     claudeCliInstalled?: boolean;
@@ -207,25 +210,63 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[92vh] overflow-y-auto flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/90 sticky top-0 z-10 backdrop-blur">
-          <div className="flex items-center gap-2.5">
-            <Settings className="w-5 h-5 text-primary" />
-            <div>
-              <h2 className="text-base font-semibold">Paramètres & Authentification</h2>
-              <p className="text-[11px] text-muted-foreground">
-                Configuration des moteurs IA (Comptes Pro & CLIs) et intégrations
-              </p>
+        <div className="px-6 pt-4 border-b border-border bg-card/90 sticky top-0 z-10 backdrop-blur">
+          <div className="flex items-center justify-between pb-3">
+            <div className="flex items-center gap-2.5">
+              <Settings className="w-5 h-5 text-primary" />
+              <div>
+                <h2 className="text-base font-semibold">Paramètres & Authentification</h2>
+                <p className="text-[11px] text-muted-foreground">
+                  Moteurs IA Pro, Hôtes Distants SSH (Mac mini) et intégrations
+                </p>
+              </div>
             </div>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+
+          {/* Navigation Tabs */}
+          <div className="flex items-center gap-1 -mb-px">
+            <button
+              type="button"
+              onClick={() => setSettingsTab("general")}
+              className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                settingsTab === "general"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Général & Moteurs IA</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSettingsTab("ssh")}
+              className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                settingsTab === "ssh"
+                  ? "border-cyan-400 text-cyan-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+              }`}
+            >
+              <Server className="w-3.5 h-3.5" />
+              <span>Hôtes SSH (Mac mini / VPS)</span>
+            </button>
+          </div>
         </div>
 
-        {/* Form Body */}
+        {/* Tab 2: SSH Hosts & Runners */}
+        {settingsTab === "ssh" && (
+          <div className="p-6">
+            <SshHostsManager onCloseParent={onClose} />
+          </div>
+        )}
+
+        {/* Tab 1: Form Body */}
+        {settingsTab === "general" && (
         <form onSubmit={handleSave} className="p-6 space-y-6">
           {/* SECTION 1: PRO ACCOUNTS & CLI FIRST (DEFAULT) */}
           <div className="rounded-xl border border-primary/40 bg-gradient-to-br from-primary/10 via-card to-background p-4 space-y-3.5 shadow-sm">
@@ -526,6 +567,7 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ import {
   Cloud,
   PackageCheck,
   ChevronDown,
+  Server,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useProjectStore } from "@/stores/project-store";
@@ -59,6 +60,14 @@ const CLI_TABS: CliTabConfig[] = [
     icon: <Rocket className="w-3.5 h-3.5" />,
     color: "text-antigravity",
     description: "Session Antigravity CLI",
+  },
+  {
+    id: "ssh",
+    label: "SSH Distant",
+    shortLabel: "SSH (Mac mini)",
+    icon: <Server className="w-3.5 h-3.5" />,
+    color: "text-cyan-400",
+    description: "Session SSH sur hôte distant (Mac mini / Runner)",
   },
   {
     id: "coolify-logs",
@@ -116,7 +125,8 @@ export function CloudCLI() {
 
   const QUICK_CMDS = [
     { label: "git status", cmd: "git status" },
-    { label: "npm test", cmd: "npm test" },
+    { label: "🌐 ssh status", cmd: "ssh status" },
+    { label: "⚡ ssh test", cmd: "ssh test" },
     { label: "claude login", cmd: "claude login" },
     { label: "agy login", cmd: "agy login" },
     { label: "npm run build", cmd: "npm run build" },

@@ -12,6 +12,12 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/utils";
+import {
+  getDefaultSshHost,
+  getSshHosts,
+  executeSshCommand,
+  testSshConnection,
+} from "@/lib/ssh-service";
 
 const execAsync = promisify(exec);
 
@@ -215,7 +221,97 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, output });
     }
 
-    // 6. Safe shell command execution
+    // 6. SSH Remote Host & Runner execution
+    if (target === "ssh" || lower.startsWith("ssh ")) {
+      const defaultHost = await getDefaultSshHost();
+
+      if (lower === "ssh help" || (target === "ssh" && lower === "help")) {
+        const sshHelp =
+          `\x1b[1;36m🌐 VibeFlow Studio — Commandes SSH & Runners Distants :\x1b[0m\r\n` +
+          `  \x1b[33mssh status\x1b[0m       Affiche l'état de l'hôte distant actif (Mac mini / VPS)\r\n` +
+          `  \x1b[33mssh hosts\x1b[0m        Liste tous les hôtes SSH configurés\r\n` +
+          `  \x1b[33mssh test\x1b[0m         Teste la connexion en direct et sonde l'hôte distant\r\n` +
+          `  \x1b[32m<commande>\x1b[0m       Dans l'onglet SSH, toute commande s'exécute sur l'hôte distant\r\n`;
+        return NextResponse.json({ success: true, output: sshHelp });
+      }
+
+      if (lower === "ssh hosts") {
+        const hosts = await getSshHosts();
+        if (hosts.length === 0) {
+          return NextResponse.json({
+            success: true,
+            output: `\x1b[33mℹ Aucun hôte SSH configuré.\x1b[0m\r\nRendez-vous dans \x1b[36mParamètres → Hôtes SSH & Runners\x1b[0m pour ajouter votre Mac mini ou serveur.\r\n`,
+          });
+        }
+        let out = `\x1b[1;36mHôtes SSH enregistrés (${hosts.length}) :\x1b[0m\r\n`;
+        hosts.forEach((h, i) => {
+          const defTag = h.isDefault ? " \x1b[32m[PAR DÉFAUT]\x1b[0m" : "";
+          const statusDot =
+            h.status === "ONLINE"
+              ? "\x1b[32m●\x1b[0m"
+              : h.status === "OFFLINE"
+              ? "\x1b[31m●\x1b[0m"
+              : "\x1b[33m●\x1b[0m";
+          out += `  ${i + 1}. ${statusDot} \x1b[1m${h.name}\x1b[0m (${h.username}@${h.host}:${h.port})${defTag}\r\n`;
+          if (h.systemInfo?.os) {
+            out += `     OS: ${h.systemInfo.os} (${h.systemInfo.arch}) · Claude: ${h.systemInfo.hasClaudeCli ? "Oui" : "Non"} · AGY: ${h.systemInfo.hasAgyCli ? "Oui" : "Non"}\r\n`;
+          }
+        });
+        return NextResponse.json({ success: true, output: out });
+      }
+
+      if (lower === "ssh status" || lower === "ssh test") {
+        if (!defaultHost) {
+          return NextResponse.json({
+            success: true,
+            output: `\x1b[33mℹ Aucun hôte SSH actif par défaut.\x1b[0m Configurez-le dans les Paramètres.\r\n`,
+          });
+        }
+
+        const testRes = await testSshConnection(defaultHost);
+        const color = testRes.success ? "\x1b[32m" : "\x1b[31m";
+        let out = `${color}${testRes.message}\x1b[0m\r\n`;
+        if (testRes.systemInfo) {
+          out +=
+            `  • Hôte : \x1b[36m${defaultHost.name}\x1b[0m (${defaultHost.username}@${defaultHost.host}:${defaultHost.port})\r\n` +
+            `  • Système : \x1b[37m${testRes.systemInfo.os} [${testRes.systemInfo.arch}]\x1b[0m\r\n` +
+            `  • Claude CLI : ${testRes.systemInfo.hasClaudeCli ? "\x1b[32mInstallé (" + (testRes.systemInfo.claudeVersion || "OK") + ")\x1b[0m" : "\x1b[33mNon détecté\x1b[0m"}\r\n` +
+            `  • Antigravity CLI : ${testRes.systemInfo.hasAgyCli ? "\x1b[32mInstallé (" + (testRes.systemInfo.agyVersion || "OK") + ")\x1b[0m" : "\x1b[33mNon détecté\x1b[0m"}\r\n` +
+            `  • Node / Git : ${testRes.systemInfo.nodeVersion || "N/A"} / ${testRes.systemInfo.gitVersion || "N/A"}\r\n`;
+        }
+        return NextResponse.json({ success: true, output: out });
+      }
+
+      // Execute on remote SSH host
+      if (!defaultHost) {
+        return NextResponse.json({
+          success: true,
+          output: `\x1b[33mℹ Aucun hôte SSH configuré.\x1b[0m Tapez \x1b[36mssh help\x1b[0m ou configurez votre Mac mini dans les Paramètres.\r\n`,
+        });
+      }
+
+      const remoteCmd = lower.startsWith("ssh ") ? command.slice(4) : command;
+
+      try {
+        const { stdout, stderr, exitCode } = await executeSshCommand(
+          defaultHost,
+          remoteCmd,
+          defaultHost.remoteWorkspace
+        );
+        let resText = (stdout || stderr || `✓ Exécuté sur ${defaultHost.name} (code ${exitCode})\r\n`).replace(/\n/g, "\r\n");
+        if (exitCode !== 0 && !resText.includes("\x1b[")) {
+          resText = `\x1b[31m${resText}\x1b[0m`;
+        }
+        return NextResponse.json({ success: true, output: resText });
+      } catch (err: any) {
+        return NextResponse.json({
+          success: true,
+          output: `\x1b[31m✖ Erreur SSH (${defaultHost.name}): ${err.message}\x1b[0m\r\n`,
+        });
+      }
+    }
+
+    // 7. Safe shell command execution
     const allowedPrefixes = [
       "git",
       "node",

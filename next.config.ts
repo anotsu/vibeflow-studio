@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
-  serverExternalPackages: ["node-pty"],
+  serverExternalPackages: ["node-pty", "ssh2"],
   webpack: (config: any, { isServer }: { isServer: boolean }) => {
     if (!isServer) {
       config.resolve.fallback = {

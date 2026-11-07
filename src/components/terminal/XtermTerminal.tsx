@@ -71,6 +71,8 @@ export function XtermTerminal({
             ? "#f97316"
             : target === "antigravity"
             ? "#3b82f6"
+            : target === "ssh"
+            ? "#06b6d4"
             : "#10b981";
 
         const term = new Terminal({
@@ -120,6 +122,9 @@ export function XtermTerminal({
         } else if (target === "antigravity") {
           term.writeln(`\x1b[35mSession Antigravity CLI — Gemini Pro (0€ token)\x1b[0m`);
           term.writeln(`\x1b[2;37mCommandes utiles : 'agy login', 'agy token <AIzaSy...>', ou tapez votre directive.\x1b[0m\r\n`);
+        } else if (target === "ssh") {
+          term.writeln(`\x1b[1;36mSession Hôte Distant SSH (Mac mini / Runner)\x1b[0m`);
+          term.writeln(`\x1b[2;37mCommandes : 'ssh status', 'ssh test', 'ssh hosts', ou tapez directement vos commandes distantes.\x1b[0m\r\n`);
         } else {
           term.writeln(`\x1b[2;37mSession Shell interactif. Tapez 'help' pour la liste des commandes.\x1b[0m\r\n`);
         }

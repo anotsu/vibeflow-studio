@@ -199,7 +199,8 @@ export type TerminalTarget =
   | "claude"
   | "antigravity"
   | "broadcast"
-  | "coolify-logs";
+  | "coolify-logs"
+  | "ssh";
 
 export interface TerminalMessage {
   type: "input" | "output" | "resize" | "error" | "system";
@@ -215,6 +216,40 @@ export interface TerminalSession {
   projectId: string;
   pid?: number;
   active: boolean;
+}
+
+// ─── SSH Remote Hosts & Runners ─────────────────────────────
+
+export interface SshSystemInfo {
+  os?: string;
+  arch?: string;
+  hostname?: string;
+  kernel?: string;
+  hasClaudeCli?: boolean;
+  claudeVersion?: string;
+  hasAgyCli?: boolean;
+  agyVersion?: string;
+  nodeVersion?: string;
+  gitVersion?: string;
+}
+
+export interface SshHostConfig {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  authType: "key" | "password";
+  privateKey?: string;
+  passphrase?: string;
+  password?: string;
+  remoteWorkspace?: string;
+  isDefault?: boolean;
+  status?: "ONLINE" | "OFFLINE" | "UNKNOWN";
+  lastTestedAt?: string;
+  systemInfo?: SshSystemInfo;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ─── Toolbox Analysis Types ─────────────────────────────────
@@ -237,7 +272,7 @@ export interface ToolboxDetectedItem {
 // ─── UI State Types ─────────────────────────────────────────
 
 export type WorkspaceTab = "kanban" | "arena" | "toolbox" | "analytics";
-export type CliTab = "bash" | "claude" | "antigravity" | "coolify-logs";
+export type CliTab = "bash" | "claude" | "antigravity" | "coolify-logs" | "ssh";
 
 export interface UIState {
   activeWorkspaceTab: WorkspaceTab;

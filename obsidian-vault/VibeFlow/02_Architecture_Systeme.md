@@ -140,3 +140,14 @@ Pour les projets configurés en mode `AUTO`, le moteur de démon 24/7 de VibeFlo
   - Fin de débat contradictoire ➔ `VibeFlow/04_AI_Debates_Logs/DEBATE-[ID].md`
   - Post-mortem auto-guérison Coolify ➔ `VibeFlow/05_Self_Healing_Reports/HEAL-[ID].md`
   - Cadrage guidé de projet ➔ `VibeFlow/06_Project_Blueprints/[slug]_Charter.md`
+
+---
+
+## 9. Hôtes Distants SSH & Runners Distribués (`ssh-service.ts`)
+
+Pour déporter l'exécution des CLIs Pro (Claude Code, Antigravity) ou ouvrir des sessions de terminal directes sur une machine dédiée (Mac mini Apple Silicon, serveur de build, VPS) :
+1. **Gestionnaire d'Hôtes SSH** : Stockage sécurisé des identifiants (clé privée avec passphrase ou mot de passe) dans `SystemSetting.ssh_hosts`.
+2. **Sonde Système 1-Clic** : Détection automatique de l'OS (`macOS Darwin arm64` / `Linux`), de `hostname`, et de la présence des CLIs `claude` et `agy`.
+3. **Terminal Interactif Déporté** : Nouvel onglet `SSH (Mac mini)` dans le terminal `CloudCLI` xterm.js avec commandes `ssh status`, `ssh test`, `ssh hosts`.
+4. **Mode Remote Runner** : Possibilité de déléguer les prompts des agents de l'arène directement sur le Mac mini pour exploiter les abonnements Claude Pro déjà configurés localement (0€ de tokens API).
+
