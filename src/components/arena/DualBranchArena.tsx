@@ -48,6 +48,8 @@ import type { TaskBenchmarkResult } from "@/lib/sandbox-runner";
 import type { DualE2ETestResult } from "@/lib/playwright-runner";
 import type { MobileTunnelInfo } from "@/lib/tunnel-manager";
 import { PersonasSkillsModal } from "@/components/arena/PersonasSkillsModal";
+import { VisualDiffModal } from "@/components/arena/VisualDiffModal";
+import type { MultimodalVisionReview } from "@/lib/vision-reviewer";
 
 type ArenaView = "diff" | "debate" | "preview";
 
@@ -81,6 +83,11 @@ export function DualBranchArena() {
 
   // Personas & Skills modal state
   const [personasModalOpen, setPersonasModalOpen] = useState(false);
+
+  // Multimodal AI Vision & Pixel Diff state
+  const [isVisionReviewing, setIsVisionReviewing] = useState(false);
+  const [visionReview, setVisionReview] = useState<MultimodalVisionReview | null>(null);
+  const [visionModalOpen, setVisionModalOpen] = useState(false);
 
   // Filter tasks that have dual branches or candidate tasks
   const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -309,6 +316,31 @@ export function DualBranchArena() {
     }
   };
 
+  // Open Multimodal AI Vision & Pixel Diff Modal
+  const handleOpenVisionDiff = async () => {
+    if (!selectedTask) return;
+    setIsVisionReviewing(true);
+    setVisionModalOpen(true);
+    try {
+      const res = await fetch(`/api/tasks/${selectedTask.id}/visual-diff`);
+      const data = await res.json();
+      if (res.ok) {
+        setVisionReview(data);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur Vision IA",
+        message: err.message || "Impossible de charger l'analyse visuelle.",
+        autoDismissMs: 3500,
+      });
+    } finally {
+      setIsVisionReviewing(false);
+    }
+  };
+
   // Trigger live simulation
   const handleRunSimulation = async () => {
     if (!selectedProject) return;
@@ -432,6 +464,21 @@ export function DualBranchArena() {
               <Gauge className="w-3.5 h-3.5 text-cyan-400" />
             )}
             <span>{isE2ETesting ? "Audit E2E..." : "⚡ Tests E2E"}</span>
+          </button>
+
+          {/* Multimodal AI Vision & Pixel Diff Button */}
+          <button
+            onClick={handleOpenVisionDiff}
+            disabled={isVisionReviewing || !selectedTask}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30 rounded-md transition-all shadow-sm disabled:opacity-50"
+            title="Lancer l'analyse critique multimodale par Vision IA & Pixel Diff (Desktop + Mobile + WCAG)"
+          >
+            {isVisionReviewing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400" />
+            ) : (
+              <Eye className="w-3.5 h-3.5 text-rose-400" />
+            )}
+            <span>{isVisionReviewing ? "Vision..." : "👁️ Vision & Pixel Diff"}</span>
           </button>
 
           {/* Hybrid Synthesis Button */}
@@ -567,6 +614,15 @@ export function DualBranchArena() {
       <PersonasSkillsModal
         isOpen={personasModalOpen}
         onClose={() => setPersonasModalOpen(false)}
+      />
+
+      {/* Multimodal AI Vision & Pixel Diff Modal */}
+      <VisualDiffModal
+        isOpen={visionModalOpen}
+        onClose={() => setVisionModalOpen(false)}
+        review={visionReview}
+        onRefresh={handleOpenVisionDiff}
+        isRefreshing={isVisionReviewing}
       />
     </div>
   );

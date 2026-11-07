@@ -96,9 +96,9 @@ updated: 2026-11-07
 ### 5.2 Analyse Critique Multimodale par Vision IA (Pixel Diff & Review Visuelle)
 - **Concept** : Évaluer l'esthétique et l'accessibilité comme un designer humain expert.
 - **Actions** :
-  - [ ] #task #antigravity [priority:: high] Captures d'écran pleine page Desktop (1920x1080) et Mobile (375x812) pour chaque branche.
-  - [ ] #task #antigravity [priority:: high] Comparaison visuelle pixel par pixel (`pixelmatch`) et injection des images dans le Juge IA Antigravity Vision pour évaluer les débordements CSS, le contraste et l'accessibilité WCAG.
-  - [ ] #task #claude [priority:: medium] Générer une image de diff superposée annotant automatiquement en rouge les zones de conflit visuel.
+  - [x] #task #antigravity [priority:: high] Captures d'écran pleine page Desktop (1280x800) et Mobile (375x812) pour chaque branche.
+  - [x] #task #antigravity [priority:: high] Comparaison visuelle pixel par pixel (Sharp RGBA) et injection dans le Juge IA Multimodal pour évaluer les débordements CSS, le contraste et l'accessibilité WCAG 2.1 AA.
+  - [x] #task #claude [priority:: medium] Générer une image de diff superposée annotant automatiquement en magenta les zones de divergence + curseur Wipe interactif (`VisualDiffModal.tsx`).
 
 ### 5.3 Métriques Web Vitals & Benchmark LCP/FID/CLS
 - **Concept** : Arbitrer les duels sur des critères objectifs de performance web.
@@ -141,7 +141,7 @@ updated: 2026-11-07
 - **Actions** :
   - [x] #task #claude [priority:: high] Créer un guide de cadrage interactif en 5 étapes (`ProjectFramingGuide.tsx` & `/api/projects/frame-blueprint`) structurant la vision, la matrice technique, le schéma de données et les règles d'or des agents.
   - [x] #task #claude [priority:: high] Génération automatique du Project Charter Markdown et synchronisation dans Obsidian (`VibeFlow/06_Project_Blueprints/[slug]_Charter.md`).
-  - [ ] #task #antigravity [priority:: medium] Prévisualisation interactive des spécifications dans l'onglet `SPECIFICATION` du Kanban avec validation en un clic.
+  - [x] #task #antigravity [priority:: medium] Prévisualisation interactive des spécifications dans le Kanban avec validation en un clic (`TaskSpecificationModal.tsx`).
 
 ### 7.2 Hub de Notifications Développeur (Telegram / Discord / Slack Webhooks)
 - **Concept** : Être alerté en mobilité lorsqu'une PR est prête ou qu'un build Coolify a été guéri.

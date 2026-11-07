@@ -22,6 +22,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { TaskWithRelations } from "@/types";
 import type { TaskStatus, TaskPriority } from "@prisma/client";
+import { TaskSpecificationModal } from "@/components/kanban/TaskSpecificationModal";
 
 interface KanbanColumn {
   id: string;
@@ -86,6 +87,7 @@ export function KanbanBoard() {
   const { tasks, selectedProject, startOrchestration } = useProjectStore();
   const { addNotification } = useUIStore();
   const [syncingObsidian, setSyncingObsidian] = useState(false);
+  const [specTask, setSpecTask] = useState<TaskWithRelations | null>(null);
 
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const getTasksForColumn = (column: KanbanColumn): TaskWithRelations[] => {
@@ -186,6 +188,7 @@ export function KanbanBoard() {
                   key={task.id}
                   task={task}
                   onStartDuel={() => handleStartDuel(task)}
+                  onOpenSpec={() => setSpecTask(task)}
                 />
               ))}
 
@@ -199,6 +202,17 @@ export function KanbanBoard() {
         );
       })}
       </div>
+
+      {/* Task BDD Gherkin Specification & Cadrage Modal */}
+      <TaskSpecificationModal
+        task={specTask}
+        isOpen={Boolean(specTask)}
+        onClose={() => setSpecTask(null)}
+        onLaunchDuel={(taskId) => {
+          const t = safeTasks.find((x) => x.id === taskId);
+          if (t) handleStartDuel(t);
+        }}
+      />
     </div>
   );
 }
@@ -208,9 +222,11 @@ export function KanbanBoard() {
 function TaskCard({
   task,
   onStartDuel,
+  onOpenSpec,
 }: {
   task: TaskWithRelations;
   onStartDuel: () => void;
+  onOpenSpec: () => void;
 }) {
   const hasDebate =
     task.debateLogs && task.debateLogs.length > 0;
@@ -219,7 +235,11 @@ function TaskCard({
     task.status === "ANTIGRAVITY_IN_PROGRESS";
 
   return (
-    <div className="kanban-card bg-card border border-border rounded-lg p-3 cursor-pointer">
+    <div
+      onClick={onOpenSpec}
+      className="kanban-card bg-card border border-border rounded-lg p-3 cursor-pointer hover:border-primary/50 transition-all hover:shadow-sm"
+      title="Cliquer pour afficher la spécification BDD & Gherkin"
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
