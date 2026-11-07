@@ -39,6 +39,7 @@ import {
   Dna,
   Gauge,
   QrCode,
+  Cpu,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -49,6 +50,7 @@ import type { DualE2ETestResult } from "@/lib/playwright-runner";
 import type { MobileTunnelInfo } from "@/lib/tunnel-manager";
 import { PersonasSkillsModal } from "@/components/arena/PersonasSkillsModal";
 import { VisualDiffModal } from "@/components/arena/VisualDiffModal";
+import { VibeCodingEngineModal } from "@/components/setup/VibeCodingEngineModal";
 import type { MultimodalVisionReview } from "@/lib/vision-reviewer";
 
 type ArenaView = "diff" | "debate" | "preview";
@@ -83,6 +85,7 @@ export function DualBranchArena() {
 
   // Personas & Skills modal state
   const [personasModalOpen, setPersonasModalOpen] = useState(false);
+  const [engineModalOpen, setEngineModalOpen] = useState(false);
 
   // Multimodal AI Vision & Pixel Diff state
   const [isVisionReviewing, setIsVisionReviewing] = useState(false);
@@ -421,6 +424,16 @@ export function DualBranchArena() {
 
         {/* Right actions: Run Sim + Benchmark + View Switcher */}
         <div className="flex items-center gap-2">
+          {/* VibeCoding Multi-Model Selector (Solo, Duel, Trio) */}
+          <button
+            onClick={() => setEngineModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 rounded-md transition-all shadow-sm"
+            title="Configurer les forfaits IA et choisir 1, 2 ou 3 Fournisseurs (Claude, Gemini, ChatGPT Codex)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            <span>Mode IA</span>
+          </button>
+
           {/* Real AI Duel Button */}
           <button
             onClick={handleRunSimulation}
@@ -610,6 +623,12 @@ export function DualBranchArena() {
         />
       )}
 
+      {/* VibeCoding Engine & Plans Matrix Modal */}
+      <VibeCodingEngineModal
+        isOpen={engineModalOpen}
+        onClose={() => setEngineModalOpen(false)}
+      />
+
       {/* Personas & Specialized Skills Modal */}
       <PersonasSkillsModal
         isOpen={personasModalOpen}
@@ -654,6 +673,7 @@ function DebateView({
   // Compute average scores
   const claudeScores = safeLogs.filter((l) => l && l.speaker === "CLAUDE" && l.qualityScore).map((l) => l.qualityScore!);
   const antigravityScores = safeLogs.filter((l) => l && l.speaker === "ANTIGRAVITY" && l.qualityScore).map((l) => l.qualityScore!);
+  const codexScores = safeLogs.filter((l) => l && (l.filePath?.toLowerCase().includes("openai") || l.filePath?.toLowerCase().includes("codex") || l.message.startsWith("[ChatGPT Codex]") || l.message.startsWith("[OpenAI")) && l.qualityScore).map((l) => l.qualityScore!);
 
   const avgClaude = claudeScores.length
     ? (claudeScores.reduce((a, b) => a + b, 0) / claudeScores.length).toFixed(1)
@@ -663,9 +683,15 @@ function DebateView({
     ? (antigravityScores.reduce((a, b) => a + b, 0) / antigravityScores.length).toFixed(1)
     : "9.2";
 
+  const avgCodex = codexScores.length
+    ? (codexScores.reduce((a, b) => a + b, 0) / codexScores.length).toFixed(1)
+    : "9.1";
+
+  const hasCodex = codexScores.length > 0 || safeLogs.some((l) => l && (l.filePath?.toLowerCase().includes("openai") || l.filePath?.toLowerCase().includes("codex") || l.message.startsWith("[ChatGPT Codex]")));
+
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {/* Duel Head-to-Head Header Card */}
+      {/* Duel / Trio Head-to-Head Header Card */}
       <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between mb-3 pb-3 border-b border-border/60">
           <div>
@@ -684,77 +710,114 @@ function DebateView({
           </div>
         </div>
 
-        {/* Versus Matchup Bar */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Versus Matchup Bar (Dual or Trio) */}
+        <div className={`grid ${hasCodex ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
           {/* Claude Agent Side */}
           <div className="p-3 bg-claude-muted/30 border border-claude/30 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-claude/20 flex items-center justify-center">
-                <Bot className="w-5 h-5 text-claude" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-claude/20 flex items-center justify-center shrink-0">
+                <Bot className="w-4 h-4 text-claude" />
               </div>
-              <div>
-                <span className="text-xs font-bold text-claude block">Claude Code Agent</span>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-claude block truncate">Claude Code</span>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    {task.claudeBranch || "agent/claude-branch"}
+                  <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[100px]">
+                    {task.claudeBranch || "agent/claude"}
                   </span>
                   {task.status === "CLAUDE_IN_PROGRESS" || task.status === "IN_DEBATE" ? (
-                    <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                    <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">
                       <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                      Working
+                      Work
                     </span>
                   ) : task.status === "SYNTHESIS" || task.status === "COMPLETED" ? (
-                    <span className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1.5 py-0.2 rounded">
+                    <span className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1 py-0.2 rounded">
                       Done
                     </span>
                   ) : (
-                    <span className="text-[9px] text-muted-foreground font-mono bg-secondary px-1.5 py-0.2 rounded">
+                    <span className="text-[9px] text-muted-foreground font-mono bg-secondary px-1 py-0.2 rounded">
                       Idle
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-sm font-extrabold text-claude font-mono">{avgClaude}/10</span>
-              <span className="text-[9px] text-muted-foreground block">Score Qualité</span>
+            <div className="text-right shrink-0">
+              <span className="text-xs font-extrabold text-claude font-mono">{avgClaude}/10</span>
+              <span className="text-[8px] text-muted-foreground block">Qualité</span>
             </div>
           </div>
 
           {/* Antigravity Agent Side */}
           <div className="p-3 bg-antigravity-muted/30 border border-antigravity/30 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-antigravity/20 flex items-center justify-center">
-                <Rocket className="w-5 h-5 text-antigravity" />
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full bg-antigravity/20 flex items-center justify-center shrink-0">
+                <Rocket className="w-4 h-4 text-antigravity" />
               </div>
-              <div>
-                <span className="text-xs font-bold text-antigravity block">Antigravity Agent</span>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-antigravity block truncate">Antigravity</span>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[10px] font-mono text-muted-foreground">
-                    {task.antigravityBranch || "agent/antigravity-branch"}
+                  <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[100px]">
+                    {task.antigravityBranch || "agent/antigravity"}
                   </span>
                   {task.status === "ANTIGRAVITY_IN_PROGRESS" || task.status === "IN_DEBATE" ? (
-                    <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                    <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">
                       <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                      Working
+                      Work
                     </span>
                   ) : task.status === "SYNTHESIS" || task.status === "COMPLETED" ? (
-                    <span className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1.5 py-0.2 rounded">
+                    <span className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1 py-0.2 rounded">
                       Done
                     </span>
                   ) : (
-                    <span className="text-[9px] text-muted-foreground font-mono bg-secondary px-1.5 py-0.2 rounded">
+                    <span className="text-[9px] text-muted-foreground font-mono bg-secondary px-1 py-0.2 rounded">
                       Idle
                     </span>
                   )}
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-sm font-extrabold text-antigravity font-mono">{avgAntigravity}/10</span>
-              <span className="text-[9px] text-muted-foreground block">Score Qualité</span>
+            <div className="text-right shrink-0">
+              <span className="text-xs font-extrabold text-antigravity font-mono">{avgAntigravity}/10</span>
+              <span className="text-[8px] text-muted-foreground block">Qualité</span>
             </div>
           </div>
+
+          {/* ChatGPT Codex Side (If Active in Debate or Trio) */}
+          {hasCodex && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <Cpu className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-bold text-emerald-400 block truncate">ChatGPT Codex</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[10px] font-mono text-muted-foreground truncate max-w-[100px]">
+                      agent/openai
+                    </span>
+                    {task.status === "IN_DEBATE" ? (
+                      <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1 py-0.2 rounded border border-emerald-500/20">
+                        <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                        Work
+                      </span>
+                    ) : task.status === "SYNTHESIS" || task.status === "COMPLETED" ? (
+                      <span className="text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1 py-0.2 rounded">
+                        Done
+                      </span>
+                    ) : (
+                      <span className="text-[9px] text-muted-foreground font-mono bg-secondary px-1 py-0.2 rounded">
+                        Idle
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs font-extrabold text-emerald-400 font-mono">{avgCodex}/10</span>
+                <span className="text-[8px] text-muted-foreground block">Qualité</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -904,12 +967,55 @@ function DebateView({
 function DebateMessageCard({ log }: { log: AgentDebateLog }) {
   const isClaude = log.speaker === "CLAUDE";
   const isAntigravity = log.speaker === "ANTIGRAVITY";
-  const isSystem = log.speaker === "SYSTEM";
+  const isCodex =
+    log.filePath?.toLowerCase().includes("openai") ||
+    log.filePath?.toLowerCase().includes("codex") ||
+    log.message.startsWith("[ChatGPT Codex]") ||
+    log.message.startsWith("[OpenAI");
+  const isSystem = log.speaker === "SYSTEM" && !isCodex;
 
   if (isSystem) {
     return (
       <div className="py-2 px-4 rounded-lg bg-secondary/40 border border-border text-center text-xs text-muted-foreground font-mono">
         ⚙️ {log.message}
+      </div>
+    );
+  }
+
+  if (isCodex) {
+    return (
+      <div className="rounded-xl p-4 border transition-all border-emerald-500/30 bg-emerald-500/10">
+        <div className="flex items-center justify-between mb-2 pb-2 border-b border-border/40">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-emerald-400" />
+            <span className="text-xs font-bold text-emerald-400">
+              ChatGPT Codex
+            </span>
+            {log.phase && (
+              <span className="text-[10px] bg-secondary text-muted-foreground px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold">
+                {log.phase} {log.round ? `· Round ${log.round}` : ""}
+              </span>
+            )}
+          </div>
+
+          {log.qualityScore && (
+            <span className="text-xs font-mono font-bold text-foreground bg-secondary px-2 py-0.5 rounded">
+              Score: {log.qualityScore.toFixed(1)}/10
+            </span>
+          )}
+        </div>
+
+        <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+          {log.message.replace(/^\[ChatGPT Codex\]\s*/, "")}
+        </p>
+
+        {log.filePath && (
+          <div className="mt-3 text-[11px] font-mono text-muted-foreground flex items-center gap-1.5 bg-black/30 px-2 py-1 rounded w-fit">
+            <FileCode className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{log.filePath}</span>
+            {log.lineStart && <span className="text-emerald-400 font-bold">#L{log.lineStart}-{log.lineEnd}</span>}
+          </div>
+        )}
       </div>
     );
   }

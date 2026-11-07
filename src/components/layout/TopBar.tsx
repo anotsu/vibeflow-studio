@@ -28,6 +28,7 @@ import {
   Sliders,
   RefreshCw,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -40,6 +41,7 @@ import { AuthDialog } from "@/components/auth/AuthDialog";
 import { AdminConsoleModal } from "@/components/admin/AdminConsoleModal";
 import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
 import { ProjectsOverviewModal } from "@/components/dashboard/ProjectsOverviewModal";
+import { VibeCodingEngineModal } from "@/components/setup/VibeCodingEngineModal";
 import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface TopBarProps {
@@ -64,6 +66,8 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const [isTicking, setIsTicking] = useState(false);
   const [daemonModalOpen, setDaemonModalOpen] = useState(false);
   const [projectsOverviewOpen, setProjectsOverviewOpen] = useState(false);
+  const [engineModalOpen, setEngineModalOpen] = useState(false);
+  const [engineLabel, setEngineLabel] = useState("Duel (2/3)");
   const [framingGuideOpen, setFramingGuideOpen] = useState(false);
   const [skillsMpStoreOpen, setSkillsMpStoreOpen] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -76,8 +80,23 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
+  const fetchEngineStatus = () => {
+    fetch("/api/settings/providers")
+      .then((res) => res.json())
+      .then((d) => {
+        if (d.success && d.engine) {
+          const count = d.engine.activeProviders?.length || 2;
+          if (count >= 3) setEngineLabel("Trio IA (3/3)");
+          else if (count === 2) setEngineLabel("Duel (2/3)");
+          else setEngineLabel(`Solo (${count}/3)`);
+        }
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetchMe();
+    fetchEngineStatus();
     fetch("/api/settings/cli-setup")
       .then((res) => res.json())
       .then((d) => {
@@ -304,6 +323,16 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
 
       {/* ── RIGHT: Status + User ── */}
       <div className="flex items-center gap-2">
+        {/* VibeCoding Engine Mode (1, 2 or 3 providers) */}
+        <button
+          onClick={() => setEngineModalOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-secondary text-xs font-semibold transition-all border border-border"
+          title="Matrice VibeCoding : Configurer les forfaits et choisir 1, 2 ou 3 Fournisseurs (Claude, Gemini, ChatGPT Codex)"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <span className="hidden xl:inline">{engineLabel}</span>
+        </button>
+
         {/* Remaining Credits & Overage Controller */}
         <CreditBalanceBadge />
 
@@ -391,6 +420,13 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
               >
                 <Layers className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span>Vue Flotte Multi-Projets</span>
+              </button>
+              <button
+                onClick={() => { setMoreMenuOpen(false); setEngineModalOpen(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span>Matrice VibeCoding (Solo / Duel / Trio)</span>
               </button>
               {selectedProject && (
                 <>
@@ -500,6 +536,13 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
       </div>
 
       {/* Modals */}
+      <VibeCodingEngineModal
+        isOpen={engineModalOpen}
+        onClose={() => {
+          setEngineModalOpen(false);
+          fetchEngineStatus();
+        }}
+      />
       <ProjectsOverviewModal
         isOpen={projectsOverviewOpen}
         onClose={() => setProjectsOverviewOpen(false)}

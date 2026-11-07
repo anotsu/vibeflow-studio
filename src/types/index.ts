@@ -165,16 +165,20 @@ export interface OrchestratorState {
   phase: OrchestratorPhase;
   claudeBranch: string;
   antigravityBranch: string;
+  openaiBranch?: string;
   synthesisBranch: string;
   currentRound: number;
   maxRounds: number;
   claudeScore: number;
   antigravityScore: number;
+  openaiScore?: number;
+  activeProviders?: Array<"claude" | "gemini" | "openai">;
+  mode?: "SOLO" | "DUEL" | "TRIO";
   errors: string[];
 }
 
 export interface AgentReview {
-  agent: "CLAUDE" | "ANTIGRAVITY";
+  agent: "CLAUDE" | "ANTIGRAVITY" | "OPENAI_CODEX" | "SYSTEM";
   targetBranch: string;
   strengths: string[];
   weaknesses: string[];

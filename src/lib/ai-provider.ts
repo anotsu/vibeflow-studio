@@ -12,9 +12,10 @@ import { isOverageAllowed, recordTokenUsage } from "@/lib/credit-service";
 export interface AICallParams {
   systemPrompt: string;
   userPrompt: string;
-  modelType?: "claude" | "antigravity" | "synthesis";
+  modelType?: "claude" | "antigravity" | "openai" | "synthesis";
   anthropicApiKey?: string | null;
   geminiApiKey?: string | null;
+  openaiApiKey?: string | null;
   temperature?: number;
   maxTokens?: number;
   preferCli?: boolean;
@@ -22,7 +23,14 @@ export interface AICallParams {
 
 export interface AIResponse {
   content: string;
-  provider: "claude-cli" | "antigravity-cli" | "anthropic-api" | "gemini-api" | "heuristic";
+  provider:
+    | "claude-cli"
+    | "antigravity-cli"
+    | "openai-cli"
+    | "anthropic-api"
+    | "gemini-api"
+    | "openai-api"
+    | "heuristic";
   modelUsed: string;
 }
 
@@ -143,6 +151,26 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
         console.warn("[AI Provider] Antigravity CLI execution skipped:", err);
       }
     }
+
+    // 1.C : ChatGPT Codex CLI (Compte ChatGPT Plus/Pro)
+    if (modelType === "openai" || modelType === "synthesis") {
+      try {
+        const cliOutput =
+          (await spawnCli("codex", ["-p", combinedPrompt])) ||
+          (await spawnCli("openai", ["chat", "-p", combinedPrompt]));
+
+        if (cliOutput && cliOutput.length > 20) {
+          console.log("[AI Provider] Successfully used ChatGPT Codex CLI (ChatGPT Plus/Pro subscription).");
+          return {
+            content: cliOutput,
+            provider: "openai-cli",
+            modelUsed: "chatgpt-codex-cli",
+          };
+        }
+      } catch (err) {
+        console.warn("[AI Provider] ChatGPT Codex CLI execution skipped:", err);
+      }
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -229,6 +257,48 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
     }
   }
 
+  // Optional OpenAI / ChatGPT Codex API Key
+  const openaiKey =
+    params.openaiApiKey ||
+    (overagePermitted ? process.env.OPENAI_API_KEY : null);
+
+  if (openaiKey && openaiKey.startsWith("sk-")) {
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature,
+          max_tokens: maxTokens,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const candidateText = data.choices?.[0]?.message?.content;
+        if (candidateText) {
+          const tokens = data.usage?.total_tokens || 850;
+          recordTokenUsage("openai", tokens).catch(() => {});
+          return {
+            content: candidateText,
+            provider: "openai-api",
+            modelUsed: "gpt-4o-codex-api",
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("[AI Provider] OpenAI API call failed, falling back:", err);
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // 3. PRIORITY 3 (RÉSILIENCE TOTALE) : Moteur Heuristique Expert
   // ─────────────────────────────────────────────────────────────
@@ -246,10 +316,11 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
 function generateHeuristicResponse(
   systemPrompt: string,
   userPrompt: string,
-  modelType: "claude" | "antigravity" | "synthesis"
+  modelType: "claude" | "antigravity" | "openai" | "synthesis"
 ): string {
   const isClaude = modelType === "claude";
   const isAntigravity = modelType === "antigravity";
+  const isOpenAI = modelType === "openai";
 
   if (systemPrompt.includes("review") || userPrompt.includes("Review") || userPrompt.includes("critique")) {
     if (isClaude) {
@@ -274,6 +345,32 @@ function generateHeuristicResponse(
           ],
           generalComment:
             "L'approche Antigravity est extrêmement fluide et orientée expérience utilisateur. En y ajoutant une couche d'idempotence et des verrous optimistes, nous obtenons une solution de classe entreprise.",
+        },
+        null,
+        2
+      );
+    } else if (isOpenAI) {
+      return JSON.stringify(
+        {
+          reviewer: "OPENAI_CODEX",
+          score: 9.1,
+          strengths: [
+            "Découpage modulaire exemplaire suivant les principes SOLID et Clean Architecture.",
+            "Excellente gestion de la mémoire et optimisation algorithmique des boucles critiques.",
+            "Adoption élégante de design patterns éprouvés (Strategy / Repository / Inversion de contrôle).",
+          ],
+          weaknesses: [
+            "Nécessite une instrumentation de métriques fines pour monitorer les performances en production.",
+            "Typage générique complexe pouvant être simplifié pour les développeurs juniors.",
+          ],
+          suggestions: [
+            {
+              file: "src/lib/engine.ts",
+              description: "Introduire un pool d'instances réutilisables et métriques d'observabilité.",
+            },
+          ],
+          generalComment:
+            "L'implémentation ChatGPT Codex apporte une puissance algorithmique et une maintenabilité à long terme de très haut niveau.",
         },
         null,
         2
@@ -363,6 +460,46 @@ export class TransactionEngine {
 }`;
   }
 
+  if (isOpenAI) {
+    return `// ============================================================
+// Implémentation ChatGPT Codex (OpenAI): Algorithmes & Modularité
+// ============================================================
+
+export interface StrategyHandler<TInput, TOutput> {
+  execute(input: TInput): Promise<TOutput>;
+}
+
+export class PipelineOrchestrator<TContext> {
+  private handlers: Array<StrategyHandler<TContext, TContext>> = [];
+  private cache = new Map<string, { value: any; expiresAt: number }>();
+
+  public use(handler: StrategyHandler<TContext, TContext>): this {
+    this.handlers.push(handler);
+    return this;
+  }
+
+  public async process(initialContext: TContext, cacheKey?: string): Promise<TContext> {
+    if (cacheKey) {
+      const cached = this.cache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.value;
+      }
+    }
+
+    let current = initialContext;
+    for (const handler of this.handlers) {
+      current = await handler.execute(current);
+    }
+
+    if (cacheKey) {
+      this.cache.set(cacheKey, { value: current, expiresAt: Date.now() + 60000 });
+    }
+
+    return current;
+  }
+}`;
+  }
+
   if (isAntigravity) {
     return `// ============================================================
 // Implémentation Antigravity CLI (Gemini Pro): Performance & UX
@@ -406,9 +543,9 @@ export const useFastActionStore = create<FastActionStore>()(
 
   // Synthesis
   return `// ============================================================
-// SYNTHÈSE CONSENSUELLE VALIDÉE PAR LES DEUX AGENTS
-// Combine la robustesse transactionnelle de Claude avec
-// la réactivité optimiste et les micro-animations d'Antigravity
+// SYNTHÈSE CONSENSUELLE VALIDÉE PAR LES AGENTS
+// Combine la robustesse transactionnelle de Claude,
+// la réactivité optimiste d'Antigravity, et l'architecture modulaire de Codex
 // ============================================================
 
 import { z } from "zod";
@@ -440,7 +577,7 @@ export const useSynthesisEngine = create<SynthesisEngineState>((set, get) => ({
     set((s) => ({ activeMutations: s.activeMutations + 1 }));
 
     try {
-      // Exécution avec intégrité transactionnelle (de Claude)
+      // Exécution avec intégrité transactionnelle & patterns modulaires (de Claude & Codex)
       await execute();
       set((s) => ({ version: s.version + 1 }));
       return true;

@@ -232,7 +232,7 @@ export function stopPreviewServer(
  * Stops all preview servers associated with a task (called upon task completion).
  */
 export function stopAllTaskPreviews(taskId: string, projectId?: string): void {
-  const roles: AgentWorktreeRole[] = ["claude", "antigravity", "synthesis"];
+  const roles: AgentWorktreeRole[] = ["claude", "antigravity", "openai", "synthesis"];
   for (const r of roles) {
     stopPreviewServer(taskId, r, projectId);
   }

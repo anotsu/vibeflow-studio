@@ -13,16 +13,18 @@ import os from "os";
 
 const execAsync = promisify(exec);
 
-export type AgentWorktreeRole = "claude" | "antigravity" | "synthesis";
+export type AgentWorktreeRole = "claude" | "antigravity" | "openai" | "synthesis";
 
 export interface WorktreePaths {
   taskId: string;
   baseDir: string;
   claudePath: string;
   antigravityPath: string;
+  openaiPath?: string;
   synthesisPath: string;
   claudeBranch: string;
   antigravityBranch: string;
+  openaiBranch?: string;
   synthesisBranch: string;
 }
 
@@ -102,10 +104,12 @@ export async function setupTaskWorktrees(
 
   const claudePath = path.join(baseDir, "claude-impl");
   const antigravityPath = path.join(baseDir, "antigravity-impl");
+  const openaiPath = path.join(baseDir, "openai-impl");
   const synthesisPath = path.join(baseDir, "synthesis-impl");
 
   const claudeBranch = `agent/claude-${taskId}`;
   const antigravityBranch = `agent/antigravity-${taskId}`;
+  const openaiBranch = `agent/openai-${taskId}`;
   const synthesisBranch = `synthesis/${taskId}`;
 
   if (!fs.existsSync(baseDir)) {
@@ -151,10 +155,11 @@ export async function setupTaskWorktrees(
     }
   }
 
-  // Provision both worktrees concurrently
+  // Provision active worktrees concurrently
   await Promise.all([
     provisionSingleWorktree(claudePath, claudeBranch),
     provisionSingleWorktree(antigravityPath, antigravityBranch),
+    provisionSingleWorktree(openaiPath, openaiBranch),
   ]);
 
   return {
@@ -162,9 +167,11 @@ export async function setupTaskWorktrees(
     baseDir,
     claudePath,
     antigravityPath,
+    openaiPath,
     synthesisPath,
     claudeBranch,
     antigravityBranch,
+    openaiBranch,
     synthesisBranch,
   };
 }
@@ -183,6 +190,8 @@ export function getAgentWorktreePath(
       return path.join(baseDir, "claude-impl");
     case "antigravity":
       return path.join(baseDir, "antigravity-impl");
+    case "openai":
+      return path.join(baseDir, "openai-impl");
     case "synthesis":
       return path.join(baseDir, "synthesis-impl");
   }
@@ -314,7 +323,7 @@ export async function cleanupTaskWorktrees(taskId: string, projectId?: string): 
     return;
   }
 
-  const subdirs = ["claude-impl", "antigravity-impl", "synthesis-impl"];
+  const subdirs = ["claude-impl", "antigravity-impl", "openai-impl", "synthesis-impl"];
 
   for (const sub of subdirs) {
     const fullPath = path.join(baseDir, sub);
@@ -419,7 +428,7 @@ export async function listActiveWorktrees(projectId?: string): Promise<ActiveWor
       const subEntries = fs.readdirSync(subPath, { withFileTypes: true });
 
       // Check if entry.name is a projectId containing task directories
-      const hasTaskDirs = subEntries.some((s) => s.isDirectory() && (s.name.includes("-impl") || ["claude-impl", "antigravity-impl", "synthesis-impl"].some(role => fs.existsSync(path.join(subPath, s.name, role)))));
+      const hasTaskDirs = subEntries.some((s) => s.isDirectory() && (s.name.includes("-impl") || ["claude-impl", "antigravity-impl", "openai-impl", "synthesis-impl"].some(role => fs.existsSync(path.join(subPath, s.name, role)))));
 
       if (hasTaskDirs) {
         const foundProjectId = entry.name;
@@ -428,7 +437,7 @@ export async function listActiveWorktrees(projectId?: string): Promise<ActiveWor
         for (const taskEntry of subEntries) {
           if (!taskEntry.isDirectory()) continue;
           const taskDir = path.join(subPath, taskEntry.name);
-          for (const role of ["claude", "antigravity", "synthesis"] as const) {
+          for (const role of ["claude", "antigravity", "openai", "synthesis"] as const) {
             const rolePath = path.join(taskDir, `${role}-impl`);
             if (fs.existsSync(rolePath)) {
               results.push({
@@ -444,7 +453,7 @@ export async function listActiveWorktrees(projectId?: string): Promise<ActiveWor
       } else {
         // Flat legacy structure (/tmp/vibeflow-worktrees/[taskId]/[role]-impl)
         if (!projectId) {
-          for (const role of ["claude", "antigravity", "synthesis"] as const) {
+          for (const role of ["claude", "antigravity", "openai", "synthesis"] as const) {
             const rolePath = path.join(subPath, `${role}-impl`);
             if (fs.existsSync(rolePath)) {
               results.push({

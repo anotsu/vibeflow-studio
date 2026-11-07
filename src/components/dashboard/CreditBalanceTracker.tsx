@@ -26,9 +26,10 @@ import {
   Gauge,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
+import type { CliTab } from "@/types";
 
 export interface CreditProviderInfo {
-  provider: "claude" | "gemini";
+  provider: "claude" | "gemini" | "openai";
   name: string;
   planType: "PRO_SUBSCRIPTION" | "FREE_TIER" | "PAY_AS_YOU_GO";
   balanceEur: number;
@@ -41,7 +42,7 @@ export interface CreditProviderInfo {
 }
 
 export interface CliQuotaInfo {
-  provider: "claude-code" | "antigravity";
+  provider: "claude-code" | "antigravity" | "openai-codex";
   name: string;
   cliBinary: string;
   installed: boolean;
@@ -68,9 +69,11 @@ export interface CreditOverageSettings {
 export interface CreditStatusSummary {
   claude: CreditProviderInfo;
   gemini: CreditProviderInfo;
+  openai?: CreditProviderInfo;
   cliQuotas: {
     claudeCode: CliQuotaInfo;
     antigravity: CliQuotaInfo;
+    openaiCodex?: CliQuotaInfo;
   };
   overageSettings: CreditOverageSettings;
   totalEstimatedBalanceEur: number;
@@ -97,6 +100,17 @@ const DEFAULT_SUMMARY: CreditStatusSummary = {
     balanceEur: 45.0,
     quotaUsedPercent: 6,
     quotaRemainingLabel: "1 500 / 1 500 req/jour",
+    status: "HEALTHY",
+    tokensConsumedToday: 0,
+    lastUpdated: new Date().toISOString(),
+  },
+  openai: {
+    provider: "openai",
+    name: "ChatGPT Codex (OpenAI)",
+    planType: "PRO_SUBSCRIPTION",
+    balanceEur: 20.0,
+    quotaUsedPercent: 10,
+    quotaRemainingLabel: "ChatGPT Plus / Codex (0€)",
     status: "HEALTHY",
     tokensConsumedToday: 0,
     lastUpdated: new Date().toISOString(),
@@ -131,6 +145,21 @@ const DEFAULT_SUMMARY: CreditStatusSummary = {
       resetEstimate: "Quotidien (Minuit UTC)",
       status: "OPTIMAL",
       statusText: "Quota abondant (0€)",
+    },
+    openaiCodex: {
+      provider: "openai-codex",
+      name: "ChatGPT Codex",
+      cliBinary: "codex",
+      installed: true,
+      authenticated: true,
+      accountLabel: "ChatGPT Plus / o3-mini (0€)",
+      remainingPercent: 88,
+      remainingLabel: "88% fenêtre 3h",
+      usedTodayCount: 0,
+      maxLimitLabel: "80 messages / 3h (GPT-4o & Codex)",
+      resetEstimate: "~1h 45m",
+      status: "OPTIMAL",
+      statusText: "Opérationnel (0€)",
     },
   },
   overageSettings: {
@@ -178,6 +207,7 @@ export function CreditBalanceBadge() {
   const isOverageOn = Boolean(data.overageSettings?.overageAllowed);
   const claudeCode = data.cliQuotas?.claudeCode;
   const ary = data.cliQuotas?.antigravity;
+  const codex = data.cliQuotas?.openaiCodex;
 
   return (
     <>
@@ -267,6 +297,7 @@ export function CreditBalanceModal({
 
   const claudeCode = data.cliQuotas?.claudeCode;
   const ary = data.cliQuotas?.antigravity;
+  const codex = data.cliQuotas?.openaiCodex;
 
   const handleToggleOverage = async () => {
     setToggling(true);
@@ -318,7 +349,7 @@ export function CreditBalanceModal({
     } catch {}
   };
 
-  const openTerminalTab = (tab: "claude" | "antigravity") => {
+  const openTerminalTab = (tab: CliTab) => {
     setActiveCliTab(tab);
     setCliPanelOpen(true);
     setCliPanelMaximized(true);
@@ -534,12 +565,82 @@ export function CreditBalanceModal({
                 </div>
               </div>
 
+              {/* Card 3: ChatGPT Codex CLI (OpenAI) */}
+              <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <Zap className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-emerald-400">ChatGPT Codex (OpenAI)</h4>
+                      <p className="text-[10px] text-muted-foreground">
+                        {codex?.accountLabel || "Session ChatGPT Plus / API"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                      codex?.authenticated
+                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                        : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                    }`}
+                  >
+                    {codex?.authenticated ? "● Quota Actif (0€)" : "Non associé"}
+                  </span>
+                </div>
+
+                {/* Quota Progress Bar */}
+                <div>
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-[11px] text-muted-foreground font-medium">
+                      Quota restant (Fenêtre 3h) :
+                    </span>
+                    <span className="text-sm font-bold font-mono text-foreground">
+                      {codex?.remainingLabel || "88% fenêtre 3h"}
+                    </span>
+                  </div>
+
+                  <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                      style={{ width: `${codex?.remainingPercent || 88}%` }}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 mt-2.5 pt-2 border-t border-emerald-500/20 text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3 h-3 text-emerald-400" />
+                      <span>Reset fenêtre : {codex?.resetEstimate || "~1h 45m"}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <Activity className="w-3 h-3 text-emerald-400" />
+                      <span>{codex?.usedTodayCount || 0} prompts traités</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] text-zinc-400">
+                    Limite : {codex?.maxLimitLabel || "80 messages / 3h (GPT-4o & Codex)"}
+                  </span>
+                  <button
+                    onClick={() => openTerminalTab("bash")}
+                    className="flex items-center gap-1 text-[11px] font-medium text-emerald-400 hover:underline"
+                  >
+                    <Terminal className="w-3 h-3" />
+                    <span>Ouvrir terminal (`codex`)</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Status summary guarantee */}
               <div className="p-3 rounded-lg bg-secondary/40 border border-border/60 flex items-start gap-2.5 text-xs text-muted-foreground">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div className="text-[11px] leading-relaxed">
                   <span className="text-foreground font-semibold">100% Autonomie Pro & Quota Gratuit : </span>
-                  Vos requêtes s&apos;exécutent sur vos abonnements illimités Claude Pro et les 1 500 req/jour offertes par Google AI Studio. Vos cartes bancaires ne sont pas sollicitées.
+                  Vos requêtes s&apos;exécutent sur vos abonnements Claude Pro, ChatGPT Plus/Codex et les 1 500 req/jour offertes par Google AI Studio. Vos cartes bancaires ne sont pas sollicitées.
                 </div>
               </div>
             </div>

@@ -178,3 +178,27 @@ updated: 2026-11-07
 - **Actions** :
   - [x] #task #claude [priority:: high] Système de "Skills" pluggables pour orienter le débat IA (ex: Skill Sécurité OWASP, Skill SEO & Métadonnées, Skill Accessibilité RGAA/WCAG).
   - [x] #task #antigravity [priority:: medium] Éditeur d'instructions de personas dans l'interface permettant de personnaliser le tempérament de chaque agent (ex: Claude "Auditeur Sécurité Paranoïaque" vs Antigravity "Designer Apple Minimaliste").
+
+---
+
+## 🚀 PHASE 9 : Moteur Multi-Forfaits & Matrice Multi-Modèles (Solo, Duel & Trio VibeCoding)
+*Objectif : Connecter n'importe quel abonnement Claude, Gemini et ChatGPT Codex, et orchestrer le VibeCoding avec 1, 2 ou 3 modèles simultanés.*
+
+### 9.1 Support Multi-Forfaits Universel (`src/lib/provider-plans.ts` & `/api/settings/providers`)
+- **Concept** : Permettre l'usage de tout forfait existant (Free Tier, Pro, Team/Max, Advanced, Plus, Clé API payante).
+- **Actions** :
+  - [x] #task #claude [priority:: critical] Définir les catalogues de plans complets pour Claude (Free, Pro $20, Team/Max, API), Gemini (AI Studio Free, Advanced, Enterprise, API) et ChatGPT Codex (Free, Plus $20, Pro $200, API).
+  - [x] #task #claude [priority:: high] Chiffrement AES-256-CBC des clés API et stockage résilient dans `SystemSetting` sans migration destructive Prisma.
+  - [x] #task #antigravity [priority:: high] Modal de configuration universel `VibeCodingEngineModal.tsx` avec sélecteur de forfait, commandes de login CLI 1-clic, test de connexion ping/latence et commutateur dynamique.
+
+### 9.2 Matrice Multi-Modèles VibeCoding (Solo / Duel / Trio)
+- **Concept** : Développer en autonomie simple (1 IA), duel contradictoire (2 IA) ou triumvirat triangulaire (3 IA).
+- **Actions** :
+  - [x] #task #dual [priority:: critical] Mode SOLO : Implémentation directe et synthèse rapide par l'agent unique sélectionné.
+  - [x] #task #dual [priority:: critical] Mode DUEL : Challenge croisé et débat contradictoire entre n'importe quelle paire (Claude × Gemini, Claude × Codex, Gemini × Codex).
+  - [x] #task #dual [priority:: critical] Mode TRIO : Implémentation en 3 worktrees (`agent/claude-*`, `agent/antigravity-*`, `agent/openai-*`), débat triangulaire à 3 voix (Architecture + UX + Algorithmes) et synthèse consensuelle suprême.
+
+### 9.3 Suivi des Crédits & Quotas en Temps Réel (`CreditBalanceTracker.tsx`)
+- **Actions** :
+  - [x] #task #antigravity [priority:: high] Cartes de vision des quotas pour Claude Code CLI, Antigravity CLI et ChatGPT Codex CLI.
+  - [x] #task #antigravity [priority:: medium] Raccourcis directs vers les onglets du terminal interactif (`claude`, `agy`, `codex`).

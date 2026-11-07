@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 const HOME_DIR = process.env.HOME || process.env.USERPROFILE || "/tmp";
 
 export interface CreditProviderInfo {
-  provider: "claude" | "gemini";
+  provider: "claude" | "gemini" | "openai";
   name: string;
   planType: "PRO_SUBSCRIPTION" | "FREE_TIER" | "PAY_AS_YOU_GO";
   balanceEur: number;
@@ -24,7 +24,7 @@ export interface CreditProviderInfo {
 }
 
 export interface CliQuotaInfo {
-  provider: "claude-code" | "antigravity";
+  provider: "claude-code" | "antigravity" | "openai-codex";
   name: string;
   cliBinary: string;
   installed: boolean;
@@ -51,9 +51,11 @@ export interface CreditOverageSettings {
 export interface CreditStatusSummary {
   claude: CreditProviderInfo;
   gemini: CreditProviderInfo;
+  openai: CreditProviderInfo;
   cliQuotas: {
     claudeCode: CliQuotaInfo;
     antigravity: CliQuotaInfo;
+    openaiCodex: CliQuotaInfo;
   };
   overageSettings: CreditOverageSettings;
   totalEstimatedBalanceEur: number;
@@ -75,6 +77,7 @@ const globalCredits = global as unknown as {
   __vibeflowTokenStats?: {
     claudeTokensToday: number;
     geminiTokensToday: number;
+    openaiTokensToday: number;
     lastResetDate: string;
   };
 };
@@ -87,6 +90,7 @@ if (!globalCredits.__vibeflowTokenStats) {
   globalCredits.__vibeflowTokenStats = {
     claudeTokensToday: 0,
     geminiTokensToday: 0,
+    openaiTokensToday: 0,
     lastResetDate: new Date().toDateString(),
   };
 }
@@ -100,6 +104,7 @@ function checkDailyReset() {
     globalCredits.__vibeflowTokenStats = {
       claudeTokensToday: 0,
       geminiTokensToday: 0,
+      openaiTokensToday: 0,
       lastResetDate: today,
     };
   }
@@ -173,14 +178,16 @@ export async function isOverageAllowed(): Promise<boolean> {
  * Records token consumption for accurate credit tracking.
  */
 export async function recordTokenUsage(
-  provider: "claude" | "gemini",
+  provider: "claude" | "gemini" | "openai",
   tokens: number
 ): Promise<void> {
   checkDailyReset();
   if (provider === "claude") {
     globalCredits.__vibeflowTokenStats!.claudeTokensToday += tokens;
-  } else {
+  } else if (provider === "gemini") {
     globalCredits.__vibeflowTokenStats!.geminiTokensToday += tokens;
+  } else {
+    globalCredits.__vibeflowTokenStats!.openaiTokensToday += tokens;
   }
 }
 
@@ -237,6 +244,32 @@ export async function getCreditStatus(): Promise<CreditStatusSummary> {
         const key = content.geminiApiKey.trim();
         agyTokenSnippet = `${key.slice(0, 4)}...${key.slice(-4)}`;
       }
+    }
+  } catch {}
+
+  // 2.B Inspect local files for ChatGPT Codex / OpenAI authentication
+  let openaiCliInstalled = false;
+  let openaiCliAuthenticated = false;
+  let openaiAccountEmail = "";
+  let openaiTokenSnippet = "";
+  const codexAuthPath = path.join(HOME_DIR, ".codex", "auth.json");
+  const openaiConfigPath = path.join(HOME_DIR, ".openai", "config.json");
+
+  try {
+    if (fs.existsSync(codexAuthPath)) {
+      openaiCliInstalled = true;
+      openaiCliAuthenticated = true;
+      openaiAccountEmail = "Compte ChatGPT Plus/Pro";
+    } else if (fs.existsSync(openaiConfigPath)) {
+      openaiCliInstalled = true;
+      openaiCliAuthenticated = true;
+      openaiAccountEmail = "Session OpenAI CLI";
+    } else if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.startsWith("sk-")) {
+      openaiCliInstalled = true;
+      openaiCliAuthenticated = true;
+      const key = process.env.OPENAI_API_KEY;
+      openaiTokenSnippet = `sk-...${key.slice(-4)}`;
+      openaiAccountEmail = "Clé API OpenAI";
     }
   } catch {}
 
@@ -358,16 +391,59 @@ export async function getCreditStatus(): Promise<CreditStatusSummary> {
     lastUpdated: new Date().toISOString(),
   };
 
+  const openaiTokens = globalCredits.__vibeflowTokenStats?.openaiTokensToday || tasksCountToday * 4100;
+  const openaiCostToday = (openaiTokens / 1_000_000) * 3.0; // ~$3 per M tokens
+  const openaiEstimatedBalanceEur = Math.max(0, 20.0 - openaiCostToday);
+  const openaiUsedPercent = Math.min(100, Math.round((openaiCostToday / 20.0) * 100));
+
+  const openaiInfo: CreditProviderInfo = {
+    provider: "openai",
+    name: "ChatGPT Codex (OpenAI)",
+    planType: openaiCliAuthenticated ? "PRO_SUBSCRIPTION" : "PAY_AS_YOU_GO",
+    balanceEur: Number(openaiEstimatedBalanceEur.toFixed(2)),
+    quotaUsedPercent: openaiUsedPercent,
+    quotaRemainingLabel: openaiCliAuthenticated
+      ? "ChatGPT Plus / Codex (0€)"
+      : `${openaiEstimatedBalanceEur.toFixed(2)} $ restant(s)`,
+    status: openaiEstimatedBalanceEur > 3.0 ? "HEALTHY" : "LOW_CREDIT",
+    resetPeriod: "Mensuel (Abonnement)",
+    tokensConsumedToday: openaiTokens,
+    lastUpdated: new Date().toISOString(),
+  };
+
+  const openai3hEstimatedPrompts = tasksCount5h * 2;
+  const openaiWindowUsedPercent = Math.min(100, Math.round((openai3hEstimatedPrompts / 80) * 100));
+  const openaiWindowRemainingPercent = Math.max(0, 100 - openaiWindowUsedPercent);
+
+  const openaiCodexQuota: CliQuotaInfo = {
+    provider: "openai-codex",
+    name: "ChatGPT Codex",
+    cliBinary: "codex / openai",
+    installed: openaiCliInstalled,
+    authenticated: openaiCliAuthenticated,
+    accountLabel: openaiAccountEmail || "Non lié",
+    remainingPercent: openaiWindowRemainingPercent,
+    remainingLabel: `${openaiWindowRemainingPercent}% fenêtre 3h`,
+    usedTodayCount: openai3hEstimatedPrompts,
+    maxLimitLabel: "80 messages / 3h (GPT-4o & Codex)",
+    resetEstimate: "~1h 45m",
+    status: openaiCliAuthenticated ? (openaiWindowRemainingPercent > 20 ? "OPTIMAL" : "LOW") : "NOT_CONNECTED",
+    statusText: openaiCliAuthenticated ? "Opérationnel (0€ token)" : "Session requise",
+    tokenSnippet: openaiTokenSnippet || undefined,
+  };
+
   const totalEstimatedBalance = Number(
-    (claudeEstimatedBalanceEur + geminiEstimatedBalanceEur).toFixed(2)
+    (claudeEstimatedBalanceEur + geminiEstimatedBalanceEur + openaiEstimatedBalanceEur).toFixed(2)
   );
 
   return {
     claude: claudeInfo,
     gemini: geminiInfo,
+    openai: openaiInfo,
     cliQuotas: {
       claudeCode: claudeCodeQuota,
       antigravity: agyQuota,
+      openaiCodex: openaiCodexQuota,
     },
     overageSettings,
     totalEstimatedBalanceEur: totalEstimatedBalance,

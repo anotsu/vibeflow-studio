@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { SshHostsManager } from "@/components/settings/SshHostsManager";
+import { VibeCodingEngineModal } from "@/components/setup/VibeCodingEngineModal";
 
 interface SettingsDialogProps {
   onClose: () => void;
@@ -41,6 +42,7 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
   const [testingCoolify, setTestingCoolify] = useState(false);
   const [testingClaude, setTestingClaude] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"general" | "ssh">("general");
+  const [engineModalOpen, setEngineModalOpen] = useState(false);
 
   const [cliInfo, setCliInfo] = useState<{
     claudeCliInstalled?: boolean;
@@ -368,6 +370,15 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
                 <span>Ouvrir l&apos;Assistance Complète de Configuration CLIs Pro (Diagnostic & Tests)</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setEngineModalOpen(true)}
+              className="w-full mt-2 py-2 px-3 rounded-lg bg-gradient-to-r from-purple-500/15 via-cyan-500/15 to-emerald-500/15 hover:from-purple-500/25 hover:to-emerald-500/25 text-foreground border border-primary/30 text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span>Matrice VibeCoding & Forfaits (Claude, Gemini, Codex · Solo, Duel, Trio)</span>
+            </button>
           </div>
 
           {/* SECTION 2: OPTIONAL API KEYS */}
@@ -569,6 +580,11 @@ export function SettingsDialog({ onClose, onOpenCliSetup }: SettingsDialogProps)
         </form>
         )}
       </div>
+
+      <VibeCodingEngineModal
+        isOpen={engineModalOpen}
+        onClose={() => setEngineModalOpen(false)}
+      />
     </div>
   );
 }
