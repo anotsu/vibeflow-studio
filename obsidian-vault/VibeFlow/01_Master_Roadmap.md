@@ -132,15 +132,15 @@ updated: 2026-11-07
 
 ---
 
-## 🎙️ PHASE 7 : Interaction Vocale, Cockpit Mobile & Alertes Temps Réel
-*Objectif : Permettre au lead developer de piloter VibeFlow à la voix ou depuis son smartphone avec des alertes intelligentes.*
+## 📱 PHASE 7 : Cockpit Mobile Développeur, Alertes Webhooks & Spécifications Structurées
+*Objectif : Permettre au lead developer de cadrer des tâches de manière chirurgicale, de recevoir des alertes en temps réel et de monitorer la vélocité de l'équipe IA.*
 
-### 7.1 Contrôle Vocal & Dictée de Spécifications ("Vibe Voice")
-- **Concept** : Dicter des spécifications complexes et déclencher des arbitrages en mains libres.
+### 7.1 Générateur de Spécifications Structurées & User Stories BDD (`specification-engine.ts`)
+- **Concept** : Transformer en un clic un besoin textuel court en un cahier des charges technique complet et sans ambiguïté.
 - **Actions** :
-  - [ ] #task #antigravity [priority:: high] Intégrer un bouton micro dans la TopBar et dans le chat de brief utilisant la Web Speech API pour dicter les tâches en langage naturel.
-  - [ ] #task #claude [priority:: high] Parseur IA convertissant la transcription vocale en user stories formattées avec critères d'acceptation Gherkin (`Given/When/Then`).
-  - [ ] #task #antigravity [priority:: medium] Synthèse vocale audio résumant la décision du Juge IA lors d'une fin de duel.
+  - [ ] #task #claude [priority:: high] Créer un assistant interactif de cadrage de spécifications convertissant une consigne en User Story standardisée avec critères d'acceptation Gherkin (`Given/When/Then`).
+  - [ ] #task #claude [priority:: high] Définition automatique des contrats d'interface TypeScript, des contraintes d'intégrité de données et des cas limites d'erreur avant le démarrage du duel.
+  - [ ] #task #antigravity [priority:: medium] Prévisualisation interactive des spécifications dans l'onglet `SPECIFICATION` du Kanban avec validation en un clic.
 
 ### 7.2 Hub de Notifications Développeur (Telegram / Discord / Slack Webhooks)
 - **Concept** : Être alerté en mobilité lorsqu'une PR est prête ou qu'un build Coolify a été guéri.
