@@ -128,8 +128,8 @@ updated: 2026-11-07
 ### 6.3 Gestionnaire Multi-Tenancy & Espaces de Travail Multiples
 - **Concept** : Orchestrer plusieurs projets en parallèle sans interférence de mémoire ou de ports.
 - **Actions** :
-  - [ ] #task #claude [priority:: high] Isolation étanche des environnements de dev lorsque plusieurs projets sont gérés simultanément dans VibeFlow.
-  - [ ] #task #antigravity [priority:: medium] Vue d'ensemble multi-projets dans le tableau de bord avec statut des daemons respectifs.
+  - [x] #task #claude [priority:: high] Isolation étanche des environnements de dev lorsque plusieurs projets sont gérés simultanément dans VibeFlow.
+  - [x] #task #antigravity [priority:: medium] Vue d'ensemble multi-projets dans le tableau de bord avec statut des daemons respectifs.
 
 ---
 

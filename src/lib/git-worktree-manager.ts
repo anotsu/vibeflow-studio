@@ -51,11 +51,41 @@ function getRepoRoot(): string {
 }
 
 /**
- * Returns the base directory for worktrees for a given task.
+ * Returns the base directory for worktrees for a given task, isolated by project.
+ * Example: /tmp/vibeflow-worktrees/[projectId]/[taskId] (or fallback /tmp/vibeflow-worktrees/[taskId])
  */
-export function getTaskWorktreeBase(taskId: string): string {
+export function getTaskWorktreeBase(taskId: string, projectId?: string): string {
   const isLinux = process.platform === "linux";
   const rootTmp = isLinux ? "/tmp/vibeflow-worktrees" : path.join(os.tmpdir(), "vibeflow-worktrees");
+
+  if (projectId) {
+    const projectDir = path.join(rootTmp, projectId, taskId);
+    if (fs.existsSync(projectDir)) {
+      return projectDir;
+    }
+    // Backward compatibility fallback to legacy flat path
+    const legacyDir = path.join(rootTmp, taskId);
+    if (fs.existsSync(legacyDir)) {
+      return legacyDir;
+    }
+    return projectDir;
+  }
+
+  // If no projectId specified, check if task exists under any project subfolder
+  if (fs.existsSync(rootTmp)) {
+    try {
+      const entries = fs.readdirSync(rootTmp, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const candidate = path.join(rootTmp, entry.name, taskId);
+          if (fs.existsSync(candidate)) {
+            return candidate;
+          }
+        }
+      }
+    } catch {}
+  }
+
   return path.join(rootTmp, taskId);
 }
 
@@ -64,10 +94,11 @@ export function getTaskWorktreeBase(taskId: string): string {
  */
 export async function setupTaskWorktrees(
   taskId: string,
-  baseBranch: string = "main"
+  baseBranch: string = "main",
+  projectId?: string
 ): Promise<WorktreePaths> {
   const repoRoot = getRepoRoot();
-  const baseDir = getTaskWorktreeBase(taskId);
+  const baseDir = getTaskWorktreeBase(taskId, projectId);
 
   const claudePath = path.join(baseDir, "claude-impl");
   const antigravityPath = path.join(baseDir, "antigravity-impl");
@@ -141,8 +172,12 @@ export async function setupTaskWorktrees(
 /**
  * Returns the directory path for a specific agent's worktree.
  */
-export function getAgentWorktreePath(taskId: string, role: AgentWorktreeRole): string {
-  const baseDir = getTaskWorktreeBase(taskId);
+export function getAgentWorktreePath(
+  taskId: string,
+  role: AgentWorktreeRole,
+  projectId?: string
+): string {
+  const baseDir = getTaskWorktreeBase(taskId, projectId);
   switch (role) {
     case "claude":
       return path.join(baseDir, "claude-impl");
@@ -163,9 +198,10 @@ export async function executeInWorktree(
   options: {
     timeoutMs?: number;
     extraEnv?: Record<string, string>;
+    projectId?: string;
   } = {}
 ): Promise<WorktreeExecResult> {
-  const worktreePath = getAgentWorktreePath(taskId, role);
+  const worktreePath = getAgentWorktreePath(taskId, role, options.projectId);
 
   if (!fs.existsSync(worktreePath)) {
     throw new Error(`Worktree for task ${taskId} (role: ${role}) does not exist at ${worktreePath}`);
@@ -179,6 +215,7 @@ export async function executeInWorktree(
     PWD: worktreePath,
     VIBEFLOW_WORKTREE_ROLE: role,
     VIBEFLOW_TASK_ID: taskId,
+    VIBEFLOW_PROJECT_ID: options.projectId || "",
     ...options.extraEnv,
   };
 
@@ -212,9 +249,10 @@ export async function executeInWorktree(
 export async function commitWorktreeChanges(
   taskId: string,
   role: AgentWorktreeRole,
-  commitMessage: string
+  commitMessage: string,
+  projectId?: string
 ): Promise<string> {
-  const worktreePath = getAgentWorktreePath(taskId, role);
+  const worktreePath = getAgentWorktreePath(taskId, role, projectId);
 
   if (!fs.existsSync(worktreePath)) {
     throw new Error(`Worktree not found for task ${taskId} at ${worktreePath}`);
@@ -240,9 +278,10 @@ export async function commitWorktreeChanges(
 export async function getWorktreeDiff(
   taskId: string,
   role: AgentWorktreeRole,
-  baseBranch: string = "main"
+  baseBranch: string = "main",
+  projectId?: string
 ): Promise<string> {
-  const worktreePath = getAgentWorktreePath(taskId, role);
+  const worktreePath = getAgentWorktreePath(taskId, role, projectId);
   if (!fs.existsSync(worktreePath)) {
     return "";
   }
@@ -267,9 +306,9 @@ export async function getWorktreeDiff(
 /**
  * Cleans up and prunes all worktrees for a task once completed or deployed.
  */
-export async function cleanupTaskWorktrees(taskId: string): Promise<void> {
+export async function cleanupTaskWorktrees(taskId: string, projectId?: string): Promise<void> {
   const repoRoot = getRepoRoot();
-  const baseDir = getTaskWorktreeBase(taskId);
+  const baseDir = getTaskWorktreeBase(taskId, projectId);
 
   if (!fs.existsSync(baseDir)) {
     return;
@@ -298,4 +337,130 @@ export async function cleanupTaskWorktrees(taskId: string): Promise<void> {
       fs.rmSync(baseDir, { recursive: true, force: true });
     } catch {}
   }
+}
+
+/**
+ * Completely purges all isolated worktrees for a project.
+ */
+export async function cleanupProjectWorktrees(projectId: string): Promise<number> {
+  const isLinux = process.platform === "linux";
+  const rootTmp = isLinux ? "/tmp/vibeflow-worktrees" : path.join(os.tmpdir(), "vibeflow-worktrees");
+  const projectDir = path.join(rootTmp, projectId);
+  const repoRoot = getRepoRoot();
+  let count = 0;
+
+  if (!fs.existsSync(projectDir)) {
+    return 0;
+  }
+
+  try {
+    const taskDirs = fs.readdirSync(projectDir, { withFileTypes: true });
+    for (const dir of taskDirs) {
+      if (dir.isDirectory()) {
+        await cleanupTaskWorktrees(dir.name, projectId);
+        count++;
+      }
+    }
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  } catch (err: any) {
+    console.warn(`[WorktreeManager] Cleanup project worktrees error for ${projectId}:`, err?.message);
+  }
+
+  try {
+    await execAsync("git worktree prune", { cwd: repoRoot });
+  } catch {}
+
+  return count;
+}
+
+export interface ActiveWorktreeInfo {
+  projectId?: string;
+  taskId: string;
+  role: string;
+  path: string;
+  sizeBytes: number;
+}
+
+/**
+ * Lists all active isolated worktrees on the system, optionally filtered by projectId.
+ */
+export async function listActiveWorktrees(projectId?: string): Promise<ActiveWorktreeInfo[]> {
+  const isLinux = process.platform === "linux";
+  const rootTmp = isLinux ? "/tmp/vibeflow-worktrees" : path.join(os.tmpdir(), "vibeflow-worktrees");
+  const results: ActiveWorktreeInfo[] = [];
+
+  if (!fs.existsSync(rootTmp)) {
+    return results;
+  }
+
+  const getDirSizeBytes = (dirPath: string): number => {
+    let size = 0;
+    try {
+      const files = fs.readdirSync(dirPath, { withFileTypes: true });
+      for (const file of files) {
+        if (file.name === ".git" || file.name === "node_modules") continue;
+        const full = path.join(dirPath, file.name);
+        if (file.isDirectory()) {
+          size += getDirSizeBytes(full);
+        } else if (file.isFile()) {
+          size += fs.statSync(full).size;
+        }
+      }
+    } catch {}
+    return size;
+  };
+
+  try {
+    const topEntries = fs.readdirSync(rootTmp, { withFileTypes: true });
+    for (const entry of topEntries) {
+      if (!entry.isDirectory()) continue;
+
+      const subPath = path.join(rootTmp, entry.name);
+      const subEntries = fs.readdirSync(subPath, { withFileTypes: true });
+
+      // Check if entry.name is a projectId containing task directories
+      const hasTaskDirs = subEntries.some((s) => s.isDirectory() && (s.name.includes("-impl") || ["claude-impl", "antigravity-impl", "synthesis-impl"].some(role => fs.existsSync(path.join(subPath, s.name, role)))));
+
+      if (hasTaskDirs) {
+        const foundProjectId = entry.name;
+        if (projectId && foundProjectId !== projectId) continue;
+
+        for (const taskEntry of subEntries) {
+          if (!taskEntry.isDirectory()) continue;
+          const taskDir = path.join(subPath, taskEntry.name);
+          for (const role of ["claude", "antigravity", "synthesis"] as const) {
+            const rolePath = path.join(taskDir, `${role}-impl`);
+            if (fs.existsSync(rolePath)) {
+              results.push({
+                projectId: foundProjectId,
+                taskId: taskEntry.name,
+                role,
+                path: rolePath,
+                sizeBytes: getDirSizeBytes(rolePath),
+              });
+            }
+          }
+        }
+      } else {
+        // Flat legacy structure (/tmp/vibeflow-worktrees/[taskId]/[role]-impl)
+        if (!projectId) {
+          for (const role of ["claude", "antigravity", "synthesis"] as const) {
+            const rolePath = path.join(subPath, `${role}-impl`);
+            if (fs.existsSync(rolePath)) {
+              results.push({
+                taskId: entry.name,
+                role,
+                path: rolePath,
+                sizeBytes: getDirSizeBytes(rolePath),
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error("[WorktreeManager] Error listing active worktrees:", err?.message);
+  }
+
+  return results;
 }

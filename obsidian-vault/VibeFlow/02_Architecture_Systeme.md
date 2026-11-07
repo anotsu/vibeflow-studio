@@ -12,23 +12,27 @@ updated: 2026-11-07
 
 ---
 
-## 1. Isolation Physique des Branches (Git Worktrees)
+## 1. Isolation Physique des Branches & Multi-Tenancy (Git Worktrees)
 
 Lorsqu'une tâche entre en phase `DUAL_DEV`, VibeFlow Studio n'exécute jamais de `git checkout` dans l'espace principal afin d'éviter tout conflit de concurrence entre Claude et Antigravity.
-Le module `src/lib/git-worktree-manager.ts` crée une hiérarchie isolée par tâche sous `/tmp/vibeflow-worktrees/` :
+Le module `src/lib/git-worktree-manager.ts` crée une hiérarchie étanche isolée par projet et par tâche sous `/tmp/vibeflow-worktrees/` :
 
 ```
 /tmp/vibeflow-worktrees/
-  └── [taskId]/
-        ├── claude-impl/       --> Branche Git: agent/claude-[taskId]
-        ├── antigravity-impl/  --> Branche Git: agent/antigravity-[taskId]
-        └── synthesis-impl/    --> Branche Git: synthesis/[taskId]
+  └── [projectId]/
+        └── [taskId]/
+              ├── claude-impl/       --> Branche Git: agent/claude-[taskId]
+              ├── antigravity-impl/  --> Branche Git: agent/antigravity-[taskId]
+              └── synthesis-impl/    --> Branche Git: synthesis/[taskId]
 ```
 
+> [!TIP] Architecture Détaillée
+> Voir la documentation complète dans [[12_Multi_Tenancy/Multi_Tenancy_Architecture|Architecture Multi-Tenancy & Flotte de Daemons 24/7]].
+
 ### Avantages Majeurs
-1. **Zéro Conflit Local** : Claude Code CLI et Antigravity CLI modifient, compilent et testent leurs fichiers dans des dossiers distincts sans aucun risque d'écrasement mutuel.
+1. **Zéro Conflit Local & Multi-Tenancy** : Claude Code CLI et Antigravity CLI modifient, compilent et testent leurs fichiers dans des dossiers distincts partitionnés par projet sans aucun risque d'écrasement mutuel.
 2. **Exécution Parallèle des Builds** : Les commandes de vérification de types (`npx tsc --noEmit`) ou de build peuvent tourner en simultané dans chaque worktree.
-3. **Nettoyage Automatisé du Cycle de Vie** : Dès que la tâche est fusionnée (`action === "merge"`), la fonction `cleanupTaskWorktrees(taskId)` supprime les dossiers (`git worktree remove --force`) et purge le dépôt (`git worktree prune`).
+3. **Nettoyage Automatisé du Cycle de Vie** : Dès que la tâche est fusionnée (`action === "merge"`), la fonction `cleanupTaskWorktrees(taskId, projectId)` supprime les dossiers (`git worktree remove --force`) et purge le dépôt (`git worktree prune`). La fonction `cleanupProjectWorktrees(projectId)` permet de purger un projet complet en 1 clic.
 
 ---
 

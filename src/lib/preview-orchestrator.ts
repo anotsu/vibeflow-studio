@@ -15,6 +15,7 @@ import { getDevExecutionPlan } from "@/lib/stack-detector";
 export type { AgentWorktreeRole };
 
 export interface PreviewInstance {
+  projectId?: string;
   taskId: string;
   role: AgentWorktreeRole;
   port: number;
@@ -79,8 +80,8 @@ export async function findAvailablePort(startPort = 4100, endPort = 4999): Promi
 /**
  * Generates cache key for an agent's preview server.
  */
-function getInstanceKey(taskId: string, role: AgentWorktreeRole): string {
-  return `${taskId}:${role}`;
+function getInstanceKey(taskId: string, role: AgentWorktreeRole, projectId?: string): string {
+  return projectId ? `${projectId}:${taskId}:${role}` : `${taskId}:${role}`;
 }
 
 /**
@@ -88,17 +89,23 @@ function getInstanceKey(taskId: string, role: AgentWorktreeRole): string {
  */
 export async function ensurePreviewServer(
   taskId: string,
-  role: AgentWorktreeRole
+  role: AgentWorktreeRole,
+  projectId?: string
 ): Promise<PreviewInstance> {
-  const key = getInstanceKey(taskId, role);
-  const existing = previewRegistry.get(key);
+  const key = getInstanceKey(taskId, role, projectId);
+  let existing = previewRegistry.get(key);
+
+  // Fallback to legacy un-namespaced key if needed
+  if (!existing && projectId) {
+    existing = previewRegistry.get(`${taskId}:${role}`);
+  }
 
   if (existing && existing.status === "running" && existing.pid) {
     existing.lastActivityAt = Date.now();
     return existing;
   }
 
-  const worktreePath = getAgentWorktreePath(taskId, role);
+  const worktreePath = getAgentWorktreePath(taskId, role, projectId);
 
   if (!fs.existsSync(worktreePath)) {
     throw new Error(`Worktree for task ${taskId} (${role}) not found at ${worktreePath}`);
@@ -107,6 +114,7 @@ export async function ensurePreviewServer(
   const port = await findAvailablePort();
 
   const instance: PreviewInstance = {
+    projectId,
     taskId,
     role,
     port,
@@ -170,9 +178,16 @@ export async function ensurePreviewServer(
 /**
  * Returns an existing preview instance or undefined.
  */
-export function getPreviewInstance(taskId: string, role: AgentWorktreeRole): PreviewInstance | undefined {
-  const key = getInstanceKey(taskId, role);
-  const instance = previewRegistry.get(key);
+export function getPreviewInstance(
+  taskId: string,
+  role: AgentWorktreeRole,
+  projectId?: string
+): PreviewInstance | undefined {
+  const key = getInstanceKey(taskId, role, projectId);
+  let instance = previewRegistry.get(key);
+  if (!instance && projectId) {
+    instance = previewRegistry.get(`${taskId}:${role}`);
+  }
   if (instance) {
     instance.lastActivityAt = Date.now();
   }
@@ -182,9 +197,16 @@ export function getPreviewInstance(taskId: string, role: AgentWorktreeRole): Pre
 /**
  * Stops a specific preview server and terminates its background process.
  */
-export function stopPreviewServer(taskId: string, role: AgentWorktreeRole): boolean {
-  const key = getInstanceKey(taskId, role);
-  const instance = previewRegistry.get(key);
+export function stopPreviewServer(
+  taskId: string,
+  role: AgentWorktreeRole,
+  projectId?: string
+): boolean {
+  const key = getInstanceKey(taskId, role, projectId);
+  let instance = previewRegistry.get(key);
+  if (!instance && projectId) {
+    instance = previewRegistry.get(`${taskId}:${role}`);
+  }
 
   if (!instance) return false;
 
@@ -200,17 +222,43 @@ export function stopPreviewServer(taskId: string, role: AgentWorktreeRole): bool
 
   instance.status = "stopped";
   previewRegistry.delete(key);
+  if (projectId) {
+    previewRegistry.delete(`${taskId}:${role}`);
+  }
   return true;
 }
 
 /**
  * Stops all preview servers associated with a task (called upon task completion).
  */
-export function stopAllTaskPreviews(taskId: string): void {
+export function stopAllTaskPreviews(taskId: string, projectId?: string): void {
   const roles: AgentWorktreeRole[] = ["claude", "antigravity", "synthesis"];
   for (const r of roles) {
-    stopPreviewServer(taskId, r);
+    stopPreviewServer(taskId, r, projectId);
   }
+}
+
+/**
+ * Stops all preview servers associated with a given project.
+ */
+export function stopProjectPreviews(projectId: string): number {
+  let count = 0;
+  for (const [key, instance] of previewRegistry.entries()) {
+    if (instance.projectId === projectId || key.startsWith(`${projectId}:`)) {
+      stopPreviewServer(instance.taskId, instance.role, projectId);
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Lists all active preview server instances, optionally filtered by projectId.
+ */
+export function listProjectPreviews(projectId?: string): PreviewInstance[] {
+  const all = Array.from(previewRegistry.values());
+  if (!projectId) return all;
+  return all.filter((p) => p.projectId === projectId);
 }
 
 /**

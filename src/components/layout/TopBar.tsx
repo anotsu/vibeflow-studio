@@ -27,6 +27,7 @@ import {
   Handshake,
   Sliders,
   RefreshCw,
+  Layers,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -38,6 +39,7 @@ import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { AdminConsoleModal } from "@/components/admin/AdminConsoleModal";
 import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
+import { ProjectsOverviewModal } from "@/components/dashboard/ProjectsOverviewModal";
 import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface TopBarProps {
@@ -61,6 +63,7 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const [hasCliAssociated, setHasCliAssociated] = useState(false);
   const [isTicking, setIsTicking] = useState(false);
   const [daemonModalOpen, setDaemonModalOpen] = useState(false);
+  const [projectsOverviewOpen, setProjectsOverviewOpen] = useState(false);
   const [framingGuideOpen, setFramingGuideOpen] = useState(false);
   const [skillsMpStoreOpen, setSkillsMpStoreOpen] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
@@ -193,6 +196,16 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
           </select>
           <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         </div>
+
+        {/* Multi-Project Fleet Button */}
+        <button
+          onClick={() => setProjectsOverviewOpen(true)}
+          className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+          title="Vue d'ensemble multi-projets & statut des daemons"
+        >
+          <Layers className="w-3.5 h-3.5 text-primary" />
+          <span className="hidden sm:inline">Flotte</span>
+        </button>
 
         {/* Git branch + Deploy status (compact) */}
         {selectedProject && (
@@ -372,6 +385,13 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
                 <Store className="w-3.5 h-3.5 text-primary shrink-0" />
                 <span>SkillsMP Store</span>
               </button>
+              <button
+                onClick={() => { setMoreMenuOpen(false); setProjectsOverviewOpen(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
+              >
+                <Layers className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span>Vue Flotte Multi-Projets</span>
+              </button>
               {selectedProject && (
                 <>
                   <div className="border-t border-border/60 my-1" />
@@ -480,6 +500,11 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
       </div>
 
       {/* Modals */}
+      <ProjectsOverviewModal
+        isOpen={projectsOverviewOpen}
+        onClose={() => setProjectsOverviewOpen(false)}
+        onOpenFramingGuide={() => setFramingGuideOpen(true)}
+      />
       <AuthDialog isOpen={authDialogOpen} onClose={() => setAuthDialogOpen(false)} />
       <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
       <AdminConsoleModal isOpen={adminConsoleOpen} onClose={() => setAdminConsoleOpen(false)} />
