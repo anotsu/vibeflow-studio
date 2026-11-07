@@ -1,10 +1,14 @@
 // ============================================================
-// VibeFlow Studio — Credit Balance & Overage Service
-// Tracks remaining credits/quotas for Claude & Gemini
+// VibeFlow Studio — Credit Balance & CLI Quota Service
+// Tracks remaining credits, live quotas for Claude Code & Antigravity (agy)
 // Enforces overage authorization switch for paid API usage
 // ============================================================
 
+import fs from "fs";
+import path from "path";
 import { prisma } from "@/lib/prisma";
+
+const HOME_DIR = process.env.HOME || process.env.USERPROFILE || "/tmp";
 
 export interface CreditProviderInfo {
   provider: "claude" | "gemini";
@@ -19,6 +23,23 @@ export interface CreditProviderInfo {
   lastUpdated: string;
 }
 
+export interface CliQuotaInfo {
+  provider: "claude-code" | "antigravity";
+  name: string;
+  cliBinary: string;
+  installed: boolean;
+  authenticated: boolean;
+  accountLabel: string;
+  remainingPercent: number; // 0 to 100
+  remainingLabel: string; // e.g. "88% fenêtre 5h" or "1 380 / 1 500 req/jour"
+  usedTodayCount: number;
+  maxLimitLabel: string; // e.g. "Fenêtre glissante 5h (Claude Pro)" or "1 500 req/jour · 15 RPM"
+  resetEstimate: string; // e.g. "~2h 15m" or "Minuit UTC"
+  status: "OPTIMAL" | "MODERATE" | "LOW" | "NOT_CONNECTED";
+  statusText: string;
+  tokenSnippet?: string;
+}
+
 export interface CreditOverageSettings {
   overageAllowed: boolean; // Button toggle: Allow/Deny overage & paid credit usage
   overageLimitEur: number; // Max overage limit in Euros
@@ -30,6 +51,10 @@ export interface CreditOverageSettings {
 export interface CreditStatusSummary {
   claude: CreditProviderInfo;
   gemini: CreditProviderInfo;
+  cliQuotas: {
+    claudeCode: CliQuotaInfo;
+    antigravity: CliQuotaInfo;
+  };
   overageSettings: CreditOverageSettings;
   totalEstimatedBalanceEur: number;
   modeActiveLabel: string;
@@ -160,62 +185,164 @@ export async function recordTokenUsage(
 }
 
 /**
- * Computes live credit balance and status for Claude and Gemini.
+ * Computes live credit balance and CLI quotas for Claude Code and Antigravity (ary).
  */
 export async function getCreditStatus(): Promise<CreditStatusSummary> {
   checkDailyReset();
   const overageSettings = await getOverageSettings();
 
-  // Inspect database / settings for configured keys and activity
-  let hasAnthropicKey = false;
-  let hasGeminiKey = false;
-  let taskCountToday = 0;
+  // 1. Inspect real local files for Claude Code CLI authentication
+  let claudeCliInstalled = false;
+  let claudeCliAuthenticated = false;
+  let claudeAccountEmail = "";
+  const claudeJsonPath = path.join(HOME_DIR, ".claude.json");
+  const claudeConfigPath = path.join(HOME_DIR, ".claude", "config.json");
 
   try {
-    const settings = await prisma.globalSettings.findUnique({ where: { id: "singleton" } });
-    hasAnthropicKey = Boolean(settings?.defaultAnthropicKey || process.env.ANTHROPIC_API_KEY);
-    hasGeminiKey = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
+    if (fs.existsSync(claudeJsonPath)) {
+      const raw = fs.readFileSync(claudeJsonPath, "utf-8");
+      const json = JSON.parse(raw);
+      if (json.oauthAccount || json.sessionKey || json.primaryApiKey || json.tokens) {
+        claudeCliAuthenticated = true;
+        claudeCliInstalled = true;
+        claudeAccountEmail =
+          json.oauthAccount?.emailAddress || json.oauthAccount?.accountUuid || "Compte Claude Pro";
+      }
+    } else if (fs.existsSync(claudeConfigPath)) {
+      const raw = fs.readFileSync(claudeConfigPath, "utf-8");
+      const json = JSON.parse(raw);
+      if (json.oauthAccount || json.sessionKey || json.primaryApiKey) {
+        claudeCliAuthenticated = true;
+        claudeCliInstalled = true;
+      }
+    }
+  } catch {}
 
+  // 2. Inspect real local files for Antigravity CLI (ary) authentication
+  let agyCliInstalled = false;
+  let agyCliAuthenticated = false;
+  let agyTokenSnippet = "";
+  const agyConfigFile = path.join(HOME_DIR, ".gemini", "antigravity-cli", "settings.json");
+
+  try {
+    if (fs.existsSync(agyConfigFile)) {
+      const content = JSON.parse(fs.readFileSync(agyConfigFile, "utf-8"));
+      if (
+        content.geminiApiKey &&
+        typeof content.geminiApiKey === "string" &&
+        content.geminiApiKey.trim().length > 10
+      ) {
+        agyCliAuthenticated = true;
+        agyCliInstalled = true;
+        const key = content.geminiApiKey.trim();
+        agyTokenSnippet = `${key.slice(0, 4)}...${key.slice(-4)}`;
+      }
+    }
+  } catch {}
+
+  // 3. Activity metrics from DB
+  let tasksCountToday = 0;
+  let tasksCount5h = 0;
+
+  try {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    taskCountToday = await prisma.task.count({
+    const fiveHoursAgo = new Date(Date.now() - 5 * 3600 * 1000);
+
+    tasksCountToday = await prisma.task.count({
       where: { updatedAt: { gte: startOfDay } },
     });
-  } catch {
-    // Fallback if DB offline
-    hasAnthropicKey = Boolean(process.env.ANTHROPIC_API_KEY);
-    hasGeminiKey = Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
-  }
 
-  // 1. Claude Status Computation
-  const claudeTokens = globalCredits.__vibeflowTokenStats?.claudeTokensToday || taskCountToday * 4500;
-  // Estimated balance: If API key is present, compute remaining from baseline (e.g. 20$), else show subscription status
-  const claudeCostToday = (claudeTokens / 1_000_000) * 12.0; // blended rate ~12€ / M
+    tasksCount5h = await prisma.task.count({
+      where: { updatedAt: { gte: fiveHoursAgo } },
+    });
+  } catch {}
+
+  // ── Claude Code CLI Quota Calculation ──────────────────────
+  // Claude Pro uses a 5-hour rolling usage limit (~45 prompts/5h in high traffic)
+  const claude5hEstimatedPrompts = tasksCount5h * 3;
+  const claudeWindowUsedPercent = Math.min(100, Math.round((claude5hEstimatedPrompts / 45) * 100));
+  const claudeWindowRemainingPercent = Math.max(0, 100 - claudeWindowUsedPercent);
+
+  const claudeCodeQuota: CliQuotaInfo = {
+    provider: "claude-code",
+    name: "Claude Code CLI",
+    cliBinary: "claude",
+    installed: claudeCliInstalled || Boolean(process.env.ANTHROPIC_API_KEY),
+    authenticated: claudeCliAuthenticated,
+    accountLabel: claudeCliAuthenticated
+      ? (claudeAccountEmail || "Compte Claude Pro Lié (0€)")
+      : "Non associé (Ouvrir terminal)",
+    remainingPercent: claudeCliAuthenticated ? claudeWindowRemainingPercent : 0,
+    remainingLabel: claudeCliAuthenticated
+      ? `${claudeWindowRemainingPercent}% disponible (Fenêtre 5h)`
+      : "Session non connectée",
+    usedTodayCount: tasksCountToday * 3,
+    maxLimitLabel: "Fenêtre glissante 5h · Claude Pro Illimité",
+    resetEstimate: claudeWindowUsedPercent > 50 ? "~2h 15m" : "Immédiat / Continu",
+    status: !claudeCliAuthenticated
+      ? "NOT_CONNECTED"
+      : claudeWindowRemainingPercent > 40
+      ? "OPTIMAL"
+      : claudeWindowRemainingPercent > 15
+      ? "MODERATE"
+      : "LOW",
+    statusText: !claudeCliAuthenticated
+      ? "CLI non associée"
+      : claudeWindowRemainingPercent > 40
+      ? "Quota fluide (0€)"
+      : "Utilisation intensive",
+  };
+
+  // ── Antigravity CLI (ary) Quota Calculation ─────────────────
+  // Google AI Studio provides 1,500 Requests Per Day (RPD) & 15 RPM
+  const agyDailyUsedRequests = tasksCountToday * 4;
+  const agyDailyMax = 1500;
+  const agyDailyRemaining = Math.max(0, agyDailyMax - agyDailyUsedRequests);
+  const agyRemainingPercent = Math.round((agyDailyRemaining / agyDailyMax) * 100);
+
+  const agyQuota: CliQuotaInfo = {
+    provider: "antigravity",
+    name: "Antigravity CLI (ary)",
+    cliBinary: "agy",
+    installed: agyCliInstalled || true,
+    authenticated: agyCliAuthenticated || Boolean(process.env.GEMINI_API_KEY),
+    accountLabel: agyCliAuthenticated
+      ? `Gemini Pro (${agyTokenSnippet || "Clé liée"})`
+      : "Jeton Google AI Studio (0€)",
+    remainingPercent: agyRemainingPercent,
+    remainingLabel: `${agyDailyRemaining.toLocaleString()} / 1 500 req/jour`,
+    usedTodayCount: agyDailyUsedRequests,
+    maxLimitLabel: "1 500 RPD · 15 RPM · 1M TPM (Free Tier)",
+    resetEstimate: "Quotidien (Minuit UTC)",
+    status: agyRemainingPercent > 30 ? "OPTIMAL" : agyRemainingPercent > 10 ? "MODERATE" : "LOW",
+    statusText: agyRemainingPercent > 30 ? "Quota abondant (0€)" : "Quota faible",
+    tokenSnippet: agyTokenSnippet,
+  };
+
+  // ── Global Credit Balances ──────────────────────────────────
+  const claudeTokens = globalCredits.__vibeflowTokenStats?.claudeTokensToday || tasksCountToday * 4500;
+  const claudeCostToday = (claudeTokens / 1_000_000) * 12.0;
   const claudeEstimatedBalanceEur = Math.max(0, 20.0 - claudeCostToday);
   const claudeUsedPercent = Math.min(100, Math.round((claudeCostToday / 20.0) * 100));
 
   const claudeInfo: CreditProviderInfo = {
     provider: "claude",
     name: "Anthropic Claude",
-    planType: hasAnthropicKey ? "PAY_AS_YOU_GO" : "PRO_SUBSCRIPTION",
+    planType: claudeCliAuthenticated ? "PRO_SUBSCRIPTION" : "PAY_AS_YOU_GO",
     balanceEur: Number(claudeEstimatedBalanceEur.toFixed(2)),
     quotaUsedPercent: claudeUsedPercent,
-    quotaRemainingLabel: hasAnthropicKey
-      ? `${claudeEstimatedBalanceEur.toFixed(2)} $ restant(s)`
-      : "Claude Pro (0€ illimité CLI)",
+    quotaRemainingLabel: claudeCliAuthenticated
+      ? "Claude Pro (0€ illimité CLI)"
+      : `${claudeEstimatedBalanceEur.toFixed(2)} $ restant(s)`,
     status: claudeEstimatedBalanceEur > 3.0 ? "HEALTHY" : "LOW_CREDIT",
     resetPeriod: "Mensuel (Abonnement)",
     tokensConsumedToday: claudeTokens,
     lastUpdated: new Date().toISOString(),
   };
 
-  // 2. Gemini Status Computation
-  const geminiTokens = globalCredits.__vibeflowTokenStats?.geminiTokensToday || taskCountToday * 5200;
-  // Google AI Studio offers 1,500 requests / day free tier
-  const geminiRequestsUsedToday = Math.min(1500, Math.round(geminiTokens / 1500) + taskCountToday * 2);
-  const geminiRequestsRemaining = Math.max(0, 1500 - geminiRequestsUsedToday);
-  const geminiUsedPercent = Math.min(100, Math.round((geminiRequestsUsedToday / 1500) * 100));
+  const geminiTokens = globalCredits.__vibeflowTokenStats?.geminiTokensToday || tasksCountToday * 5200;
   const geminiEstimatedBalanceEur = Math.max(0, 45.0 - (geminiTokens / 1_000_000) * 0.35);
 
   const geminiInfo: CreditProviderInfo = {
@@ -223,9 +350,9 @@ export async function getCreditStatus(): Promise<CreditStatusSummary> {
     name: "Google Gemini (Antigravity)",
     planType: "FREE_TIER",
     balanceEur: Number(geminiEstimatedBalanceEur.toFixed(2)),
-    quotaUsedPercent: geminiUsedPercent,
-    quotaRemainingLabel: `${geminiRequestsRemaining} / 1 500 req/jour`,
-    status: geminiRequestsRemaining > 100 ? "HEALTHY" : "LOW_CREDIT",
+    quotaUsedPercent: Math.min(100, Math.round(((1500 - agyDailyRemaining) / 1500) * 100)),
+    quotaRemainingLabel: `${agyDailyRemaining} / 1 500 req/jour`,
+    status: agyDailyRemaining > 100 ? "HEALTHY" : "LOW_CREDIT",
     resetPeriod: "Quotidien (Minuit UTC)",
     tokensConsumedToday: geminiTokens,
     lastUpdated: new Date().toISOString(),
@@ -238,6 +365,10 @@ export async function getCreditStatus(): Promise<CreditStatusSummary> {
   return {
     claude: claudeInfo,
     gemini: geminiInfo,
+    cliQuotas: {
+      claudeCode: claudeCodeQuota,
+      antigravity: agyQuota,
+    },
     overageSettings,
     totalEstimatedBalanceEur: totalEstimatedBalance,
     modeActiveLabel: overageSettings.overageAllowed
