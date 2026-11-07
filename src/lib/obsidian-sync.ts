@@ -1,6 +1,7 @@
 // ============================================================
 // VibeFlow Studio — Obsidian Bidirectional Synchronization Engine
-// Integrates local disk vault (/obsidian-vault) & live Local REST API
+// Structured cleanly under the dedicated "VibeFlow" vault folder
+// Direct pure UTF-8 streaming to avoid any character corruption
 // http://192.168.1.203:27123 with Bearer Auth
 // ============================================================
 
@@ -13,41 +14,90 @@ const OBSIDIAN_DEFAULT_TOKEN =
   process.env.OBSIDIAN_REST_TOKEN || "817225bdd85485f2d234f36f36862363ca85e5c6ff69b35c19a1b4576ebf9c39";
 
 /**
- * Returns the local vault directory path.
+ * Returns the local disk path to the VibeFlow vault folder.
  */
-export function getLocalVaultDir(): string {
+export function getVibeFlowVaultDir(): string {
   const cwd = process.cwd();
-  const directVault = path.join(cwd, "obsidian-vault");
+  const directVault = path.join(cwd, "obsidian-vault", "VibeFlow");
   if (fs.existsSync(directVault)) {
     return directVault;
   }
-  const parentVault = path.join(cwd, "..", "obsidian-vault");
+  const parentVault = path.join(cwd, "..", "obsidian-vault", "VibeFlow");
   if (fs.existsSync(parentVault)) {
     return parentVault;
   }
-  return directVault;
+  // Default to creating inside cwd/obsidian-vault/VibeFlow
+  const target = path.join(cwd, "obsidian-vault", "VibeFlow");
+  if (!fs.existsSync(target)) {
+    fs.mkdirSync(target, { recursive: true });
+  }
+  return target;
 }
 
 /**
- * Helper to upload markdown file to the live Obsidian Local REST API.
+ * Uploads markdown file to the live Obsidian Local REST API in pure UTF-8.
+ * Always places notes under the dedicated "VibeFlow/" folder.
  */
-async function pushToLiveObsidianApi(vaultRelativePath: string, markdownContent: string): Promise<boolean> {
+export async function pushToLiveObsidianApi(
+  vaultRelativePath: string,
+  markdownContent: string
+): Promise<boolean> {
   const apiUrl = OBSIDIAN_DEFAULT_URL.replace(/\/+$/, "");
-  const normalizedPath = vaultRelativePath.replace(/\\/g, "/").replace(/^\/+/, "");
-  const endpoint = `${apiUrl}/vault/${encodeURI(normalizedPath)}`;
+  
+  // Ensure path starts with VibeFlow/
+  let cleanPath = vaultRelativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  if (!cleanPath.startsWith("VibeFlow/")) {
+    cleanPath = `VibeFlow/${cleanPath}`;
+  }
+
+  // Encode each path segment properly to support UTF-8 characters and spaces
+  const encodedPath = cleanPath
+    .split("/")
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+
+  const endpoint = `${apiUrl}/vault/${encodedPath}`;
 
   try {
+    const utf8Buffer = Buffer.from(markdownContent, "utf-8");
     const res = await fetch(endpoint, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${OBSIDIAN_DEFAULT_TOKEN}`,
-        "Content-Type": "text/markdown",
+        "Content-Type": "text/markdown; charset=utf-8",
+        Accept: "application/json",
       },
-      body: markdownContent,
+      body: utf8Buffer,
     });
     return res.ok;
   } catch (err: any) {
     console.warn(`[ObsidianSync] Failed to push to live API (${endpoint}): ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Deletes a file from the live Obsidian vault if present.
+ */
+export async function deleteFromLiveObsidianApi(vaultRelativePath: string): Promise<boolean> {
+  const apiUrl = OBSIDIAN_DEFAULT_URL.replace(/\/+$/, "");
+  const cleanPath = vaultRelativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const encodedPath = cleanPath
+    .split("/")
+    .map((seg) => encodeURIComponent(seg))
+    .join("/");
+
+  const endpoint = `${apiUrl}/vault/${encodedPath}`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${OBSIDIAN_DEFAULT_TOKEN}`,
+      },
+    });
+    return res.status === 204 || res.status === 200 || res.status === 404;
+  } catch {
     return false;
   }
 }
@@ -91,7 +141,7 @@ function mapStatusToTag(status: string): string {
 }
 
 /**
- * Synchronizes a single Task to an Obsidian Markdown note.
+ * Synchronizes a single Task to an Obsidian Markdown note in VibeFlow/03_Kanban_Tasks/
  */
 export async function syncTaskToObsidian(taskId: string): Promise<{
   success: boolean;
@@ -113,15 +163,15 @@ export async function syncTaskToObsidian(taskId: string): Promise<{
     throw new Error(`Task ${taskId} not found`);
   }
 
-  const vaultDir = getLocalVaultDir();
-  const tasksDir = path.join(vaultDir, "03_Kanban_Tasks");
+  const vibeFlowDir = getVibeFlowVaultDir();
+  const tasksDir = path.join(vibeFlowDir, "03_Kanban_Tasks");
   if (!fs.existsSync(tasksDir)) {
     fs.mkdirSync(tasksDir, { recursive: true });
   }
 
   const taskSlug = slugify(task.title);
   const fileName = `TASK-${task.id.slice(-6).toUpperCase()}-${taskSlug}.md`;
-  const relativeVaultPath = `03_Kanban_Tasks/${fileName}`;
+  const relativeVaultPath = `VibeFlow/03_Kanban_Tasks/${fileName}`;
   const localFilePath = path.join(tasksDir, fileName);
 
   const statusTag = mapStatusToTag(task.status);
@@ -152,7 +202,7 @@ updated: ${new Date().toISOString()}
 
 > [!INFO] Fiche Technique Tâche
 > **Projet** : ${task.project.name} (\`${task.project.githubRepo}\`)
-> **Priorité** : \`${task.priority}\` | **Statut** : \`${task.status}\` | **Agent** : ${agentOwner}
+> **Priorité** : \`${task.priority}\` | **Statut** : \`${task.status}\` | **Agent Assigné** : ${agentOwner}
 > **Branche Claude** : \`${task.claudeBranch || "Non provisionnée"}\`
 > **Branche Antigravity** : \`${task.antigravityBranch || "Non provisionnée"}\`
 
@@ -192,10 +242,10 @@ ${
 
   const fullContent = `${frontmatter}\n${body.trim()}\n`;
 
-  // 1. Write to local disk
+  // 1. Write to local disk in UTF-8
   fs.writeFileSync(localFilePath, fullContent, "utf-8");
 
-  // 2. Push to live Obsidian REST API
+  // 2. Push to live Obsidian REST API in UTF-8
   const liveApiSynced = await pushToLiveObsidianApi(relativeVaultPath, fullContent);
 
   return {
@@ -212,6 +262,9 @@ export async function syncAllTasksToObsidian(projectId?: string): Promise<{
   syncedCount: number;
   liveApiOnline: boolean;
 }> {
+  // First ensure core documents are up to date in VibeFlow/
+  await syncCoreVaultDocuments();
+
   const where = projectId ? { projectId } : {};
   const tasks = await prisma.task.findMany({
     where,
@@ -233,7 +286,7 @@ export async function syncAllTasksToObsidian(projectId?: string): Promise<{
 }
 
 /**
- * Exports a full debate log into /obsidian-vault/04_AI_Debates_Logs/
+ * Exports a full debate log into VibeFlow/04_AI_Debates_Logs/
  */
 export async function exportDebateToObsidian(taskId: string): Promise<string> {
   const task = await prisma.task.findUnique({
@@ -246,14 +299,14 @@ export async function exportDebateToObsidian(taskId: string): Promise<string> {
 
   if (!task) throw new Error(`Task ${taskId} not found`);
 
-  const vaultDir = getLocalVaultDir();
-  const debatesDir = path.join(vaultDir, "04_AI_Debates_Logs");
+  const vibeFlowDir = getVibeFlowVaultDir();
+  const debatesDir = path.join(vibeFlowDir, "04_AI_Debates_Logs");
   if (!fs.existsSync(debatesDir)) {
     fs.mkdirSync(debatesDir, { recursive: true });
   }
 
   const fileName = `DEBATE-${task.id.slice(-6).toUpperCase()}.md`;
-  const relativeVaultPath = `04_AI_Debates_Logs/${fileName}`;
+  const relativeVaultPath = `VibeFlow/04_AI_Debates_Logs/${fileName}`;
   const localFilePath = path.join(debatesDir, fileName);
 
   const frontmatter = `---
@@ -288,7 +341,7 @@ updated: ${new Date().toISOString()}
 }
 
 /**
- * Exports a self-healing post-mortem report to /obsidian-vault/05_Self_Healing_Reports/
+ * Exports a self-healing post-mortem report to VibeFlow/05_Self_Healing_Reports/
  */
 export async function exportHealingReportToObsidian(
   deploymentId: string,
@@ -301,14 +354,14 @@ export async function exportHealingReportToObsidian(
     success: boolean;
   }
 ): Promise<string> {
-  const vaultDir = getLocalVaultDir();
-  const healingDir = path.join(vaultDir, "05_Self_Healing_Reports");
+  const vibeFlowDir = getVibeFlowVaultDir();
+  const healingDir = path.join(vibeFlowDir, "05_Self_Healing_Reports");
   if (!fs.existsSync(healingDir)) {
     fs.mkdirSync(healingDir, { recursive: true });
   }
 
   const fileName = `HEAL-${deploymentId.slice(-8)}.md`;
-  const relativeVaultPath = `05_Self_Healing_Reports/${fileName}`;
+  const relativeVaultPath = `VibeFlow/05_Self_Healing_Reports/${fileName}`;
   const localFilePath = path.join(healingDir, fileName);
 
   const frontmatter = `---
@@ -346,6 +399,35 @@ ${(data.errorLogs || "Aucun log fourni").slice(0, 1500)}
 }
 
 /**
+ * Uploads all core architecture notes from disk to the live Obsidian API in pure UTF-8.
+ */
+export async function syncCoreVaultDocuments(): Promise<boolean> {
+  const vibeFlowDir = getVibeFlowVaultDir();
+
+  const coreFiles = [
+    "00_Cockpit_VibeFlow.md",
+    "01_Master_Roadmap.md",
+    "02_Architecture_Systeme.md",
+  ];
+
+  let allSuccess = true;
+  for (const fileName of coreFiles) {
+    const diskPath = path.join(vibeFlowDir, fileName);
+    if (fs.existsSync(diskPath)) {
+      const content = fs.readFileSync(diskPath, "utf-8");
+      const ok = await pushToLiveObsidianApi(`VibeFlow/${fileName}`, content);
+      if (!ok) allSuccess = false;
+    }
+  }
+
+  // Also clean up any accidental old files in root if they exist
+  await deleteFromLiveObsidianApi("00_Dashboard_Home.md");
+  await deleteFromLiveObsidianApi("01_Master_Roadmap.md");
+
+  return allSuccess;
+}
+
+/**
  * Checks the status and connectivity of the live Obsidian vault and Local REST API.
  */
 export async function getObsidianVaultHealth(): Promise<{
@@ -356,16 +438,15 @@ export async function getObsidianVaultHealth(): Promise<{
   liveApiOnline: boolean;
   liveApiUrl: string;
 }> {
-  const vaultDir = getLocalVaultDir();
-  const tasksDir = path.join(vaultDir, "03_Kanban_Tasks");
-  const debatesDir = path.join(vaultDir, "04_AI_Debates_Logs");
-  const healingDir = path.join(vaultDir, "05_Self_Healing_Reports");
+  const vibeFlowDir = getVibeFlowVaultDir();
+  const tasksDir = path.join(vibeFlowDir, "03_Kanban_Tasks");
+  const debatesDir = path.join(vibeFlowDir, "04_AI_Debates_Logs");
+  const healingDir = path.join(vibeFlowDir, "05_Self_Healing_Reports");
 
   const tasksCount = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir).filter((f) => f.endsWith(".md")).length : 0;
   const debatesCount = fs.existsSync(debatesDir) ? fs.readdirSync(debatesDir).filter((f) => f.endsWith(".md")).length : 0;
   const healingReportsCount = fs.existsSync(healingDir) ? fs.readdirSync(healingDir).filter((f) => f.endsWith(".md")).length : 0;
 
-  // Test live API ping
   let liveApiOnline = false;
   try {
     const res = await fetch(`${OBSIDIAN_DEFAULT_URL.replace(/\/+$/, "")}/`, {
@@ -377,7 +458,7 @@ export async function getObsidianVaultHealth(): Promise<{
   }
 
   return {
-    vaultPath: vaultDir,
+    vaultPath: vibeFlowDir,
     tasksCount,
     debatesCount,
     healingReportsCount,
