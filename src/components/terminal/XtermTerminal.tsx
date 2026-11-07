@@ -7,7 +7,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { TerminalTarget } from "@/types";
 import { io, Socket } from "socket.io-client";
-import { Loader2, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { Loader2, RefreshCw, Wifi, WifiOff, ShieldAlert, Sparkles, Check, X } from "lucide-react";
+import { detectAgentState, type DetectedAgentStatus } from "@/lib/agent-state-detector";
 
 interface XtermTerminalProps {
   target: TerminalTarget;
@@ -28,7 +29,21 @@ export function XtermTerminal({
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [agentStatus, setAgentStatus] = useState<DetectedAgentStatus | null>(null);
+  const terminalHistoryRef = useRef<string>("");
   const sessionIdRef = useRef<string>(`term-${target}-${Date.now()}`);
+
+  const sendTerminalInput = (input: string) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit("terminal:input", {
+        sessionId: sessionIdRef.current,
+        data: input,
+      });
+    } else if (xtermInstance.current) {
+      // In standalone emulator mode, execute via API
+      handleLocalSimulation(input, xtermInstance.current, target, projectId);
+    }
+  };
 
   const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001";
 
@@ -128,6 +143,10 @@ export function XtermTerminal({
         socket.on("terminal:output", (msg: { sessionId: string; data: string }) => {
           if (msg.sessionId === sessionIdRef.current) {
             term.write(msg.data);
+            terminalHistoryRef.current = (terminalHistoryRef.current + msg.data).slice(-4000);
+            const pref = target === "claude" ? "claude" : target === "antigravity" ? "antigravity" : undefined;
+            const detected = detectAgentState(terminalHistoryRef.current, pref);
+            setAgentStatus(detected);
           }
         });
 
@@ -234,6 +253,30 @@ export function XtermTerminal({
             Target: {target.toUpperCase()}
           </span>
           {projectId && <span className="opacity-70">Project: #{projectId.slice(0, 8)}</span>}
+
+          {/* Agent State Badge (calibrated from Herdr) */}
+          {agentStatus && agentStatus.state !== "UNKNOWN" && (
+            <div className="flex items-center gap-1 ml-2">
+              {agentStatus.state === "WORKING" && (
+                <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Working</span>
+                </span>
+              )}
+              {agentStatus.state === "BLOCKED" && (
+                <span className="flex items-center gap-1 text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse">
+                  <ShieldAlert className="w-3 h-3 text-amber-400" />
+                  <span>Bloqué (Action requise)</span>
+                </span>
+              )}
+              {agentStatus.state === "IDLE" && (
+                <span className="flex items-center gap-1 text-zinc-400 bg-secondary px-2 py-0.5 rounded-full text-[10px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                  <span>Idle</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <button
@@ -246,6 +289,43 @@ export function XtermTerminal({
           <RefreshCw className="w-3 h-3" /> Fit
         </button>
       </div>
+
+      {/* Interactive Action Alert Banner when Agent is BLOCKED (Herdr pattern) */}
+      {agentStatus?.state === "BLOCKED" && (
+        <div className="px-3 py-1.5 bg-gradient-to-r from-amber-950/80 via-card to-background border-b border-amber-500/40 flex items-center justify-between gap-3 text-xs animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="min-w-0">
+              <span className="text-amber-200 font-bold block truncate">
+                {agentStatus.reason}
+              </span>
+              {agentStatus.blockerDetails && (
+                <span className="text-[10px] font-mono text-muted-foreground truncate block">
+                  {agentStatus.blockerDetails}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {agentStatus.suggestedActions.map((action, idx) => (
+              <button
+                key={idx}
+                onClick={() => sendTerminalInput(action.input)}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition-all shadow-sm ${
+                  action.variant === "primary"
+                    ? "bg-amber-500 hover:bg-amber-400 text-black"
+                    : action.variant === "danger"
+                    ? "bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
+                    : "bg-secondary hover:bg-secondary/80 text-foreground"
+                }`}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {isInitializing && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#09090b]/80 z-10">

@@ -511,9 +511,25 @@ function DebateView({
               </div>
               <div>
                 <span className="text-xs font-bold text-claude block">Claude Code Agent</span>
-                <span className="text-[10px] font-mono text-muted-foreground">
-                  {task.claudeBranch || "agent/claude-branch"}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {task.claudeBranch || "agent/claude-branch"}
+                  </span>
+                  {task.status === "CLAUDE_IN_PROGRESS" || task.status === "IN_DEBATE" ? (
+                    <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                      <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                      Working
+                    </span>
+                  ) : task.status === "SYNTHESIS" || task.status === "COMPLETED" ? (
+                    <span className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1.5 py-0.2 rounded">
+                      Done
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-muted-foreground font-mono bg-secondary px-1.5 py-0.2 rounded">
+                      Idle
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="text-right">
@@ -530,9 +546,25 @@ function DebateView({
               </div>
               <div>
                 <span className="text-xs font-bold text-antigravity block">Antigravity Agent</span>
-                <span className="text-[10px] font-mono text-muted-foreground">
-                  {task.antigravityBranch || "agent/antigravity-branch"}
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {task.antigravityBranch || "agent/antigravity-branch"}
+                  </span>
+                  {task.status === "ANTIGRAVITY_IN_PROGRESS" || task.status === "IN_DEBATE" ? (
+                    <span className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
+                      <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                      Working
+                    </span>
+                  ) : task.status === "SYNTHESIS" || task.status === "COMPLETED" ? (
+                    <span className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1.5 py-0.2 rounded">
+                      Done
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-muted-foreground font-mono bg-secondary px-1.5 py-0.2 rounded">
+                      Idle
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="text-right">
