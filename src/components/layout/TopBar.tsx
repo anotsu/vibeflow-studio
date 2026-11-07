@@ -31,7 +31,7 @@ import {
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { TokenSavingsBadge } from "@/components/dashboard/TokenSavingsTracker";
+import { CreditBalanceBadge } from "@/components/dashboard/CreditBalanceTracker";
 import { DaemonControllerModal } from "@/components/dashboard/DaemonControllerModal";
 import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide";
 import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
@@ -291,8 +291,8 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
 
       {/* ── RIGHT: Status + User ── */}
       <div className="flex items-center gap-2">
-        {/* Token Savings */}
-        <TokenSavingsBadge />
+        {/* Remaining Credits & Overage Controller */}
+        <CreditBalanceBadge />
 
         {/* CLI Status Badge */}
         <button

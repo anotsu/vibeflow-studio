@@ -92,7 +92,8 @@ flowchart TD
   - `/root/.claude` ➔ `/home/nextjs/.claude`
   - `/root/.gemini` ➔ `/home/nextjs/.gemini`
 - Même après un rebuild complet de l'image Docker, vos accès Pro restent connectés sans ressaisie de jeton.
-- Le composant `src/components/dashboard/TokenSavingsTracker.tsx` affiche en temps réel les jetons réellement consommés (partant de 0.00 € en l'absence d'activité réelle).
+- Le composant `CreditBalanceTracker.tsx` remplace l'ancien widget d'économies en affichant la vision en direct des crédits restants (Claude Pro vs API, Gemini 1 500 req/j gratuites).
+- **Contrôleur d'Overage Dédié** : Un interrupteur interactif permet d'activer ou désactiver l'overage et la consommation de crédits payants. En mode désactivé (recommandé), le système applique une politique stricte 0€ évitant toute surprise de facturation API.
 
 ---
 

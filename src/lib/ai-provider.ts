@@ -7,6 +7,7 @@
 
 import { spawn } from "child_process";
 import Anthropic from "@anthropic-ai/sdk";
+import { isOverageAllowed, recordTokenUsage } from "@/lib/credit-service";
 
 export interface AICallParams {
   systemPrompt: string;
@@ -148,11 +149,13 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
   // 2. PRIORITY 2 (FACULTATIF / OPTIONNEL) : Clés API si fournies
   // ─────────────────────────────────────────────────────────────
 
-  // Optional Anthropic API Key
+  // Verify if overage / paid API credit consumption is authorized
+  const overagePermitted = await isOverageAllowed();
+
+  // Optional Anthropic API Key (only used if explicitly provided or overage is allowed)
   const anthropicKey =
     params.anthropicApiKey ||
-    process.env.ANTHROPIC_API_KEY ||
-    process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY;
+    (overagePermitted ? process.env.ANTHROPIC_API_KEY || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY : null);
 
   if (anthropicKey && anthropicKey.startsWith("sk-ant")) {
     try {
@@ -167,6 +170,8 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
 
       const textBlock = res.content.find((b) => b.type === "text");
       if (textBlock && textBlock.text) {
+        const tokens = (res.usage?.input_tokens || 500) + (res.usage?.output_tokens || 500);
+        recordTokenUsage("claude", tokens).catch(() => {});
         return {
           content: textBlock.text,
           provider: "anthropic-api",
@@ -181,8 +186,7 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
   // Optional Google Gemini API Key
   const geminiKey =
     params.geminiApiKey ||
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY;
+    (overagePermitted ? process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY : null);
 
   if (geminiKey) {
     try {
@@ -211,6 +215,8 @@ export async function callAI(params: AICallParams): Promise<AIResponse> {
         const candidateText =
           data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (candidateText) {
+          const tokens = data.usageMetadata?.totalTokenCount || 800;
+          recordTokenUsage("gemini", tokens).catch(() => {});
           return {
             content: candidateText,
             provider: "gemini-api",
