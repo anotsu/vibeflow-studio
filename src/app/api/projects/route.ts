@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { slugify, encrypt } from "@/lib/utils";
 import type { MilestonePhase } from "@prisma/client";
+import { syncTaskToObsidian } from "@/lib/obsidian-sync";
 
 /**
  * GET /api/projects
@@ -240,7 +241,7 @@ export async function POST(request: NextRequest) {
           project.milestones.find((m) => m.order === (t.phaseOrder || 1)) ||
           project.milestones[0];
 
-        await prisma.task.create({
+        const createdTask = await prisma.task.create({
           data: {
             projectId: project.id,
             milestoneId: targetMilestone?.id || null,
@@ -250,7 +251,16 @@ export async function POST(request: NextRequest) {
             origin: "AI_GENERATED",
             status: "BACKLOG",
           },
-        }).catch((err) => console.warn("Failed to create initial task:", err));
+        }).catch((err) => {
+          console.warn("Failed to create initial task:", err);
+          return null;
+        });
+
+        if (createdTask) {
+          syncTaskToObsidian(createdTask.id).catch((err) =>
+            console.warn(`[POST /api/projects] Obsidian sync failed for initial task ${createdTask.id}:`, err?.message)
+          );
+        }
       }
     }
 
