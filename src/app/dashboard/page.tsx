@@ -12,6 +12,7 @@ import {
   Plus,
   Loader2,
   FolderGit2,
+  Compass,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -23,6 +24,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { WorkspaceTab } from "@/types";
 import { CreateProjectDialog } from "@/components/dashboard/CreateProjectDialog";
+import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide";
 import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
 import { CliSetupWizard } from "@/components/setup/CliSetupWizard";
 
@@ -71,6 +73,7 @@ export default function DashboardPage() {
   } = useUIStore();
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showFramingGuide, setShowFramingGuide] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showCliSetupWizard, setShowCliSetupWizard] = useState(false);
 
@@ -165,17 +168,28 @@ export default function DashboardPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
+                onClick={() => setShowFramingGuide(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all shadow-md"
+              >
+                <Compass className="w-4 h-4 text-purple-200" />
+                🧭 Cadrer un Nouveau Projet (Guide Pré-VibeCoding)
+              </button>
+
+              <button
                 onClick={() => setShowCreateDialog(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-secondary text-foreground border border-border rounded-lg text-sm font-semibold hover:bg-secondary/80 transition-colors shadow-sm"
               >
                 <FolderGit2 className="w-4 h-4" />
-                Lire un GitHub & Générer le projet
+                Lire un GitHub Existant
               </button>
             </div>
           </div>
         </div>
         {showCreateDialog && (
           <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />
+        )}
+        {showFramingGuide && (
+          <ProjectFramingGuide onClose={() => setShowFramingGuide(false)} />
         )}
         {showSettingsDialog && (
           <SettingsDialog
@@ -259,6 +273,11 @@ export default function DashboardPage() {
       {/* Create Project Dialog */}
       {showCreateDialog && (
         <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />
+      )}
+
+      {/* Project Framing & Blueprint Guide */}
+      {showFramingGuide && (
+        <ProjectFramingGuide onClose={() => setShowFramingGuide(false)} />
       )}
 
       {/* Global Settings Dialog */}

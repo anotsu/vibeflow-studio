@@ -18,11 +18,13 @@ import {
   Play,
   Loader2,
   Sliders,
+  Compass,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import { TokenSavingsBadge } from "@/components/dashboard/TokenSavingsTracker";
 import { DaemonControllerModal } from "@/components/dashboard/DaemonControllerModal";
+import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
@@ -35,6 +37,7 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const { setSelectedProjectId, notifications, addNotification } = useUIStore();
   const [isTicking, setIsTicking] = useState(false);
   const [daemonModalOpen, setDaemonModalOpen] = useState(false);
+  const [framingGuideOpen, setFramingGuideOpen] = useState(false);
 
   const isAuto = selectedProject?.mode === "AUTO";
 
@@ -130,6 +133,16 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
           title="Refresh projects"
         >
           <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Project Framing & Blueprint Guide */}
+        <button
+          onClick={() => setFramingGuideOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-500/10 to-primary/10 hover:from-purple-500/20 hover:to-primary/20 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all shadow-sm"
+          title="Ouvrir le Guide de Cadrage Pré-VibeCoding & Blueprint Projet"
+        >
+          <Compass className="w-3.5 h-3.5 text-purple-400" />
+          <span className="hidden md:inline">Cadrer Projet</span>
         </button>
       </div>
 
@@ -264,6 +277,11 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
         isOpen={daemonModalOpen}
         onClose={() => setDaemonModalOpen(false)}
       />
+
+      {/* Project Framing & Blueprint Guide */}
+      {framingGuideOpen && (
+        <ProjectFramingGuide onClose={() => setFramingGuideOpen(false)} />
+      )}
     </header>
   );
 }

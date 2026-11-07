@@ -27,10 +27,12 @@ import {
   ArrowRight,
   PackageCheck,
   RefreshCw,
+  Compass,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { GitHubAnalysisResult } from "@/lib/github-project-scanner";
+import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide";
 
 interface CreateProjectDialogProps {
   onClose: () => void;
@@ -40,7 +42,7 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
   const { createProject, fetchProjects } = useProjectStore();
   const { setSelectedProjectId, addNotification } = useUIStore();
 
-  const [mode, setMode] = useState<"import_github" | "blank">("import_github");
+  const [mode, setMode] = useState<"import_github" | "guided" | "blank">("import_github");
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -164,6 +166,18 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
     }
   };
 
+  if (mode === "guided") {
+    return (
+      <ProjectFramingGuide
+        onClose={onClose}
+        onProjectCreated={(id) => {
+          setSelectedProjectId(id);
+          onClose();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto flex flex-col">
@@ -182,31 +196,40 @@ export function CreateProjectDialog({ onClose }: CreateProjectDialogProps) {
         </div>
 
         {/* Mode Switcher Tabs */}
-        <div className="grid grid-cols-2 p-2 bg-secondary/30 border-b border-border gap-2">
+        <div className="grid grid-cols-3 p-2 bg-secondary/30 border-b border-border gap-1.5">
           <button
             type="button"
             onClick={() => setMode("import_github")}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold transition-all ${
               mode === "import_github"
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-secondary"
             }`}
           >
-            <FolderGit2 className="w-4 h-4" />
-            <span>Lire GitHub & Générer (Projet en cours)</span>
+            <FolderGit2 className="w-3.5 h-3.5" />
+            <span className="truncate">Lire GitHub</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode("guided")}
+            className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold text-purple-300 hover:text-purple-200 hover:bg-purple-950/30 border border-purple-500/20 transition-all"
+          >
+            <Compass className="w-3.5 h-3.5 text-purple-400" />
+            <span className="truncate font-bold">🧭 Cadrage Guidé</span>
           </button>
 
           <button
             type="button"
             onClick={() => setMode("blank")}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-lg text-xs font-semibold transition-all ${
               mode === "blank"
                 ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-secondary"
             }`}
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Nouveau projet (Depuis zéro)</span>
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span className="truncate">Création Rapide</span>
           </button>
         </div>
 

@@ -135,11 +135,11 @@ updated: 2026-11-07
 ## 📱 PHASE 7 : Cockpit Mobile Développeur, Alertes Webhooks & Spécifications Structurées
 *Objectif : Permettre au lead developer de cadrer des tâches de manière chirurgicale, de recevoir des alertes en temps réel et de monitorer la vélocité de l'équipe IA.*
 
-### 7.1 Générateur de Spécifications Structurées & User Stories BDD (`specification-engine.ts`)
-- **Concept** : Transformer en un clic un besoin textuel court en un cahier des charges technique complet et sans ambiguïté.
+### 7.1 Guide de Cadrage Pré-VibeCoding & Générateur de Blueprint (`ProjectFramingGuide.tsx` & `frame-blueprint`)
+- **Concept** : Cadrer un projet de manière exhaustive (Vision, Stack, Modèle de données, Jalons et Règles d'agents) avant de rentrer dans le code.
 - **Actions** :
-  - [ ] #task #claude [priority:: high] Créer un assistant interactif de cadrage de spécifications convertissant une consigne en User Story standardisée avec critères d'acceptation Gherkin (`Given/When/Then`).
-  - [ ] #task #claude [priority:: high] Définition automatique des contrats d'interface TypeScript, des contraintes d'intégrité de données et des cas limites d'erreur avant le démarrage du duel.
+  - [x] #task #claude [priority:: high] Créer un guide de cadrage interactif en 5 étapes (`ProjectFramingGuide.tsx` & `/api/projects/frame-blueprint`) structurant la vision, la matrice technique, le schéma de données et les règles d'or des agents.
+  - [x] #task #claude [priority:: high] Génération automatique du Project Charter Markdown et synchronisation dans Obsidian (`VibeFlow/06_Project_Blueprints/[slug]_Charter.md`).
   - [ ] #task #antigravity [priority:: medium] Prévisualisation interactive des spécifications dans l'onglet `SPECIFICATION` du Kanban avec validation en un clic.
 
 ### 7.2 Hub de Notifications Développeur (Telegram / Discord / Slack Webhooks)
