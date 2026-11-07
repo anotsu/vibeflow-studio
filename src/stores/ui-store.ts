@@ -48,7 +48,7 @@ export const useUIStore = create<UIStore>((set) => ({
   activeWorkspaceTab: "kanban",
   activeCliTab: "bash",
   sidebarOpen: true,
-  cliPanelOpen: true,
+  cliPanelOpen: false,
   cliPanelPosition: "bottom",
   cliPanelMaximized: false,
   selectedProjectId: null,

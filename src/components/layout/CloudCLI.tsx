@@ -1,6 +1,6 @@
 // ============================================================
 // VibeFlow Studio — CloudCLI Panel (Multi-tab Terminal)
-// Integrated with xterm.js, PTY sockets & Shared Context
+// UX Refonte v2 — Bouton flottant élégant + Panel compact
 // ============================================================
 "use client";
 
@@ -9,18 +9,17 @@ import {
   Terminal,
   Bot,
   Rocket,
-  ChevronUp,
   Maximize2,
   Minimize2,
   X,
   Columns,
   Rows,
-  Radio,
   ScrollText,
   Info,
   GitBranch,
   Cloud,
   PackageCheck,
+  ChevronDown,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useProjectStore } from "@/stores/project-store";
@@ -30,6 +29,7 @@ import { XtermTerminal } from "@/components/terminal/XtermTerminal";
 interface CliTabConfig {
   id: CliTab;
   label: string;
+  shortLabel: string;
   icon: React.ReactNode;
   color: string;
   description: string;
@@ -38,31 +38,35 @@ interface CliTabConfig {
 const CLI_TABS: CliTabConfig[] = [
   {
     id: "bash",
-    label: "Terminal Bash",
+    label: "Terminal",
+    shortLabel: "Terminal",
     icon: <Terminal className="w-3.5 h-3.5" />,
-    color: "text-green-400",
-    description: "Système & Shell Unix",
+    color: "text-emerald-400",
+    description: "Shell Bash / Système",
   },
   {
     id: "claude",
-    label: "Claude Code",
+    label: "Claude",
+    shortLabel: "Claude",
     icon: <Bot className="w-3.5 h-3.5" />,
     color: "text-claude",
-    description: "Session dédiée Claude CLI",
+    description: "Session Claude CLI",
   },
   {
     id: "antigravity",
     label: "Antigravity",
+    shortLabel: "AGY",
     icon: <Rocket className="w-3.5 h-3.5" />,
     color: "text-antigravity",
-    description: "Session dédiée Antigravity CLI",
+    description: "Session Antigravity CLI",
   },
   {
     id: "coolify-logs",
-    label: "Coolify Logs",
+    label: "Logs Déploiement",
+    shortLabel: "Logs",
     icon: <ScrollText className="w-3.5 h-3.5" />,
-    color: "text-yellow-400",
-    description: "Flux de logs conteneur en direct",
+    color: "text-amber-400",
+    description: "Flux de logs Coolify en direct",
   },
 ];
 
@@ -80,18 +84,19 @@ export function CloudCLI() {
   } = useUIStore();
 
   const { selectedProject, toolboxItems, deployments } = useProjectStore();
+  const [showContextBar, setShowContextBar] = useState(false);
 
-  const [showContextBar, setShowContextBar] = useState(true);
-
+  // ── Floating Button (panel closed) ────────────────────────
   if (!cliPanelOpen) {
     return (
       <button
         onClick={toggleCliPanel}
-        className="fixed bottom-4 right-4 flex items-center gap-2 px-3 py-2 bg-card border border-border rounded-lg shadow-xl text-sm font-medium text-foreground hover:bg-secondary transition-all z-50 group"
+        className="fixed bottom-5 right-5 flex items-center gap-2 px-3.5 py-2 bg-card/90 backdrop-blur-sm border border-border rounded-xl shadow-lg text-xs font-medium text-foreground hover:bg-secondary hover:border-primary/30 transition-all z-50 group"
+        title="Ouvrir le terminal CloudCLI"
       >
         <Terminal className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-        <span>Ouvrir CloudCLI</span>
-        <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+        <span>Terminal</span>
+        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground rotate-180" />
       </button>
     );
   }
@@ -102,68 +107,68 @@ export function CloudCLI() {
 
   const panelClasses =
     cliPanelPosition === "bottom"
-      ? `border-t border-border ${cliPanelMaximized ? "h-[75vh]" : "h-80"}`
-      : `border-l border-border w-[480px] ${cliPanelMaximized ? "w-[60vw]" : "w-[480px]"}`;
+      ? `border-t border-border w-full ${cliPanelMaximized ? "h-[70vh]" : "h-72"}`
+      : `border-l border-border ${cliPanelMaximized ? "w-[55vw]" : "w-[460px]"}`;
 
   const sharedContext = selectedProject
     ? `Repo: ${selectedProject.githubRepo} | Branch: ${selectedProject.githubDefaultBranch} | Missing Tools: ${missingItems.length} | Coolify: ${lastDeployment?.status || "Idle"}`
     : "Aucun projet sélectionné";
 
+  const QUICK_CMDS = [
+    { label: "git status", cmd: "git status" },
+    { label: "npm test", cmd: "npm test" },
+    { label: "claude login", cmd: "claude login" },
+    { label: "agy login", cmd: "agy login" },
+    { label: "npm run build", cmd: "npm run build" },
+  ];
+
   return (
     <div
-      className={`bg-[#09090b] flex flex-col shrink-0 transition-all duration-200 z-30 ${panelClasses}`}
+      className={`bg-[#09090b] flex flex-col shrink-0 transition-all duration-200 ${panelClasses}`}
     >
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-card/60 backdrop-blur">
+      {/* ── Header Bar ── */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-card/50 backdrop-blur shrink-0">
         {/* Tabs */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {CLI_TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveCliTab(tab.id)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                activeCliTab === tab.id
-                  ? `bg-secondary ${tab.color} shadow-sm border border-border/50`
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-              }`}
               title={tab.description}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeCliTab === tab.id
+                  ? `bg-secondary/80 ${tab.color} border border-border/50`
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+              }`}
             >
               {tab.icon}
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="hidden sm:inline">{tab.shortLabel}</span>
             </button>
           ))}
-
-          {/* Broadcast Trigger */}
-          <button
-            onClick={() => setActiveCliTab("claude")}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-primary transition-colors ml-1.5"
-            title="Diffuser les prompts aux deux agents simultanément"
-          >
-            <Radio className="w-3.5 h-3.5 text-primary animate-pulse" />
-            <span className="hidden md:inline text-[11px]">Broadcast Mode</span>
-          </button>
         </div>
 
-        {/* Panel controls */}
+        {/* Controls */}
         <div className="flex items-center gap-1">
+          {/* Context toggle */}
           <button
             onClick={() => setShowContextBar(!showContextBar)}
-            className={`p-1 rounded text-xs transition-colors ${
-              showContextBar ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"
+            className={`p-1.5 rounded-md text-xs transition-colors ${
+              showContextBar
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
             }`}
-            title="Afficher/masquer le contexte partagé injecté"
+            title="Afficher/masquer le contexte injecté"
           >
             <Info className="w-3.5 h-3.5" />
           </button>
 
+          {/* Position toggle */}
           <button
             onClick={() =>
-              setCliPanelPosition(
-                cliPanelPosition === "bottom" ? "right" : "bottom"
-              )
+              setCliPanelPosition(cliPanelPosition === "bottom" ? "right" : "bottom")
             }
-            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-            title="Basculer la position (Bas / Droite)"
+            className="p-1.5 rounded-md hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
+            title="Basculer position (Bas / Droite)"
           >
             {cliPanelPosition === "bottom" ? (
               <Columns className="w-3.5 h-3.5" />
@@ -172,9 +177,10 @@ export function CloudCLI() {
             )}
           </button>
 
+          {/* Maximize */}
           <button
             onClick={toggleCliPanelMaximized}
-            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
             title={cliPanelMaximized ? "Réduire" : "Maximiser"}
           >
             {cliPanelMaximized ? (
@@ -184,9 +190,10 @@ export function CloudCLI() {
             )}
           </button>
 
+          {/* Close */}
           <button
             onClick={toggleCliPanel}
-            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
             title="Fermer le terminal"
           >
             <X className="w-3.5 h-3.5" />
@@ -194,48 +201,38 @@ export function CloudCLI() {
         </div>
       </div>
 
-      {/* Shared Context Injection Bar */}
+      {/* ── Context Bar (optional, collapsed by default) ── */}
       {showContextBar && (
-        <div className="flex items-center gap-4 px-3 py-1 bg-secondary/30 border-b border-border/40 text-[11px] text-muted-foreground select-none overflow-x-auto">
+        <div className="flex items-center gap-4 px-3 py-1.5 bg-secondary/20 border-b border-border/40 text-[11px] text-muted-foreground overflow-x-auto shrink-0">
           <span className="font-semibold text-foreground flex items-center gap-1 shrink-0">
-            <Info className="w-3 h-3 text-primary" /> Contexte injecté :
+            <Info className="w-3 h-3 text-primary" />
+            Contexte :
           </span>
-
           <div className="flex items-center gap-1.5 shrink-0">
-            <GitBranch className="w-3 h-3 text-foreground" />
+            <GitBranch className="w-3 h-3" />
             <span>{selectedProject?.githubRepo || "N/A"}</span>
           </div>
-
           <div className="flex items-center gap-1.5 shrink-0">
-            <PackageCheck className="w-3 h-3 text-yellow-400" />
+            <PackageCheck className="w-3 h-3 text-amber-400" />
             <span>
               {missingItems.length > 0
                 ? `${missingItems.length} outil(s) manquant(s)`
-                : "Boîte à outils complète"}
+                : "Stack complète"}
             </span>
           </div>
-
           <div className="flex items-center gap-1.5 shrink-0">
             <Cloud className="w-3 h-3 text-blue-400" />
-            <span>Déploiement: {lastDeployment?.status || "Prêt"}</span>
+            <span>{lastDeployment?.status || "Prêt"}</span>
           </div>
         </div>
       )}
 
-      {/* Quick Action Commands Bar */}
-      <div className="flex items-center gap-1.5 px-3 py-1 bg-black/40 border-b border-border/30 text-[11px] overflow-x-auto select-none">
-        <span className="text-[10px] text-zinc-500 font-mono shrink-0 uppercase tracking-wider font-semibold">
-          Actions rapides :
+      {/* ── Quick Commands ── */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/30 border-b border-border/20 overflow-x-auto shrink-0">
+        <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wider shrink-0">
+          Rapide :
         </span>
-        {[
-          { label: "⚡ Statut CLIs Pro", cmd: "agy -p 'ping' && claude --version" },
-          { label: "🔑 Claude Login", cmd: "claude login" },
-          { label: "🔑 Antigravity Login", cmd: "agy login" },
-          { label: "📊 Git status", cmd: "git status" },
-          { label: "📦 Dépendances", cmd: "npm list --depth=0" },
-          { label: "🧪 Tests unitaires", cmd: "npm test" },
-          { label: "🚀 Santé Coolify", cmd: "curl -sI https://vibeflow.capstation.fr" },
-        ].map((action, idx) => (
+        {QUICK_CMDS.map((action, idx) => (
           <button
             key={idx}
             onClick={() => {
@@ -243,20 +240,20 @@ export function CloudCLI() {
               addNotification({
                 type: "info",
                 title: "Commande copiée",
-                message: `Collez dans le terminal: ${action.cmd}`,
-                autoDismissMs: 2500,
+                message: action.cmd,
+                autoDismissMs: 2000,
               });
             }}
-            className="px-2 py-0.5 rounded bg-zinc-800/60 hover:bg-zinc-700/80 text-zinc-300 hover:text-white border border-zinc-700/40 text-[10px] font-mono transition-colors shrink-0 flex items-center gap-1"
-            title={`Copier dans le presse-papier: ${action.cmd}`}
+            className="px-2 py-0.5 rounded bg-zinc-800/70 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 border border-zinc-700/40 text-[10px] font-mono transition-colors shrink-0"
+            title={`Copier : ${action.cmd}`}
           >
-            <span>{action.label}</span>
+            {action.label}
           </button>
         ))}
       </div>
 
-      {/* Real xterm.js Terminal Container */}
-      <div className="flex-1 w-full h-full overflow-hidden">
+      {/* ── xterm.js Terminal ── */}
+      <div className="flex-1 w-full overflow-hidden">
         <XtermTerminal
           key={activeCliTab}
           target={activeCliTab === "coolify-logs" ? "bash" : activeCliTab}

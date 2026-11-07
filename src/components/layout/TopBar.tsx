@@ -1,5 +1,6 @@
 // ============================================================
-// VibeFlow Studio — TopBar Component
+// VibeFlow Studio — TopBar Component (UX Refonte v2)
+// Inspiré Linear / Vercel / Cursor — Minimaliste & Efficace
 // ============================================================
 "use client";
 
@@ -8,25 +9,24 @@ import {
   GitBranch,
   Cloud,
   Zap,
-  Handshake,
   ChevronDown,
   Settings,
   Bell,
-  RefreshCw,
   ExternalLink,
   CircleDot,
   Play,
   Loader2,
-  Sliders,
   Compass,
   Store,
   LogOut,
   UserCircle,
   ShieldAlert,
-  User,
-  ShieldCheck,
   KeyRound,
   Terminal,
+  MoreHorizontal,
+  Handshake,
+  Sliders,
+  RefreshCw,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -55,6 +55,7 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
     setActiveCliTab,
     setCliPanelOpen,
     setCliPanelMaximized,
+    toggleSidebar,
   } = useUIStore();
   const { user, isAdmin, isAuthenticated, logout, fetchMe } = useAuthStore();
   const [hasCliAssociated, setHasCliAssociated] = useState(false);
@@ -66,7 +67,11 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const [adminConsoleOpen, setAdminConsoleOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchMe();
@@ -80,19 +85,22 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
       .catch(() => {});
   }, [fetchMe]);
 
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
         setUserMenuOpen(false);
       }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
     };
-    if (userMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [userMenuOpen]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const isAuto = selectedProject?.mode === "AUTO";
 
@@ -135,36 +143,47 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
     }
   };
 
-  // Derive status badges
+  const openTerminal = () => {
+    setActiveCliTab("bash");
+    setCliPanelOpen(true);
+    setCliPanelMaximized(false);
+  };
+
+  // Deployment badge
   const lastDeployment = Array.isArray(selectedProject?.deployments)
     ? selectedProject.deployments[0]
     : undefined;
   const coolifyStatus = lastDeployment?.status || "UNKNOWN";
-  const coolifyStatusColor =
+  const deployBadge =
     coolifyStatus === "RUNNING"
-      ? "text-green-400"
+      ? { label: "Live", cls: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30" }
       : coolifyStatus === "BUILDING"
-        ? "text-yellow-400"
+        ? { label: "Build...", cls: "text-amber-400 bg-amber-500/10 border-amber-500/30" }
         : coolifyStatus === "FAILED"
-          ? "text-red-400"
-          : "text-muted-foreground";
+          ? { label: "Échec", cls: "text-red-400 bg-red-500/10 border-red-500/30" }
+          : null;
+
+  const unreadNotifs = notifications.length;
 
   return (
-    <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 gap-4 shrink-0">
-      {/* Left: Logo + Project Selector */}
-      <div className="flex items-center gap-4">
-        {/* Official Brand Logo */}
+    <header className="h-12 border-b border-border bg-card flex items-center justify-between px-3 gap-3 shrink-0">
+      {/* ── LEFT: Logo + Project ── */}
+      <div className="flex items-center gap-3 min-w-0">
+        {/* Logo */}
         <VibeFlowLogo size="sm" withGlow href="/dashboard" />
 
+        {/* Separator */}
+        <div className="h-5 w-px bg-border" />
+
         {/* Project Selector */}
-        <div className="relative">
+        <div className="relative flex items-center gap-1">
           <select
             value={selectedProject?.id || ""}
             onChange={handleProjectChange}
-            className="appearance-none bg-secondary text-foreground text-sm rounded-md pl-3 pr-8 py-1.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            className="appearance-none bg-transparent text-foreground text-sm font-medium pl-0 pr-6 py-1 focus:outline-none cursor-pointer hover:text-primary transition-colors max-w-[160px] truncate"
           >
             <option value="" disabled>
-              Select a project...
+              Sélectionner un projet...
             </option>
             {(Array.isArray(projects) ? projects : []).map((p) => (
               <option key={p.id} value={p.id}>
@@ -172,125 +191,82 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
               </option>
             ))}
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
         </div>
 
-        <button
-          onClick={() => fetchProjects()}
-          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-          title="Refresh projects"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Project Framing & Blueprint Guide */}
-        <button
-          onClick={() => setFramingGuideOpen(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-500/10 to-primary/10 hover:from-purple-500/20 hover:to-primary/20 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-all shadow-sm"
-          title="Ouvrir le Guide de Cadrage Pré-VibeCoding & Blueprint Projet"
-        >
-          <Compass className="w-3.5 h-3.5 text-purple-400" />
-          <span className="hidden md:inline">Cadrer Projet</span>
-        </button>
-
-        {/* SkillsMP Store */}
-        <button
-          onClick={() => setSkillsMpStoreOpen(true)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-semibold transition-all shadow-sm"
-          title="Ouvrir le Store de Compétences SkillsMP (skillsmp.com)"
-        >
-          <Store className="w-3.5 h-3.5 text-primary" />
-          <span className="hidden md:inline">SkillsMP Store</span>
-        </button>
-      </div>
-
-      {/* Center: GitHub & Coolify Status */}
-      {selectedProject && (
-        <div className="flex items-center gap-6 text-xs">
-          {/* GitHub Status */}
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <GitBranch className="w-3.5 h-3.5" />
-            <span className="text-foreground font-medium">
-              {selectedProject.githubDefaultBranch}
-            </span>
-            <span className="text-muted-foreground">·</span>
-            <span>{selectedProject.githubRepo}</span>
-          </div>
-
-          {/* Coolify Status */}
-          <div className="flex items-center gap-2">
-            <Cloud className={`w-3.5 h-3.5 ${coolifyStatusColor}`} />
-            <span className={`font-medium ${coolifyStatusColor}`}>
-              {coolifyStatus === "RUNNING"
-                ? "Live"
-                : coolifyStatus === "BUILDING"
-                  ? "Building..."
-                  : coolifyStatus === "FAILED"
-                    ? "Failed"
-                    : "—"}
-            </span>
+        {/* Git branch + Deploy status (compact) */}
+        {selectedProject && (
+          <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <GitBranch className="w-3 h-3" />
+              <span className="font-mono">{selectedProject.githubDefaultBranch}</span>
+            </div>
+            {deployBadge && (
+              <span
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${deployBadge.cls}`}
+              >
+                <span className="w-1 h-1 rounded-full bg-current" />
+                {deployBadge.label}
+              </span>
+            )}
             {lastDeployment?.previewUrl && (
               <a
                 href={lastDeployment.previewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title="Ouvrir l'URL de prévisualisation"
               >
                 <ExternalLink className="w-3 h-3" />
               </a>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Polyglot Tech Stack Badges */}
-          {toolboxItems && toolboxItems.length > 0 && (
-            <div className="hidden xl:flex items-center gap-1.5 border-l border-border/60 pl-4">
-              {toolboxItems
-                .filter(
-                  (t) =>
-                    t.status === "ACQUIRED" &&
-                    (t.category === "FRAMEWORK" || t.category === "DATABASE" || t.category === "UI_KIT")
-                )
-                .slice(0, 3)
-                .map((tool) => (
-                  <span
-                    key={tool.id}
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-secondary text-foreground/80 border border-border"
-                    title={`${tool.name} (${tool.category})`}
-                  >
-                    {tool.name}
-                  </span>
-                ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* ── CENTER: Primary Actions ── */}
+      <div className="flex items-center gap-1.5">
+        {/* Cadrer Projet — CTA primaire */}
+        <button
+          onClick={() => setFramingGuideOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold transition-colors border border-primary/20"
+          title="Guide de cadrage Pré-VibeCoding & Blueprint Projet"
+        >
+          <Compass className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">Cadrer</span>
+        </button>
 
-      {/* Right: Mode Toggle + Actions */}
-      <div className="flex items-center gap-3">
+        {/* Terminal — accès rapide */}
+        <button
+          onClick={openTerminal}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+          title="Ouvrir le terminal CloudCLI"
+        >
+          <Terminal className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">Terminal</span>
+        </button>
+
         {/* Mode Toggle */}
         {selectedProject && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               onClick={handleModeToggle}
-              className={`
-                flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-300
-                ${
-                  isAuto
-                    ? "bg-primary/20 text-primary border border-primary/30 mode-toggle-auto"
-                    : "bg-secondary text-muted-foreground border border-border hover:text-foreground"
-                }
-              `}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                isAuto
+                  ? "bg-primary/15 text-primary border border-primary/25 mode-toggle-auto"
+                  : "hover:bg-secondary text-muted-foreground hover:text-foreground"
+              }`}
+              title={isAuto ? "Mode Auto 24/7 — Cliquer pour passer en Accompagné" : "Mode Accompagné — Cliquer pour activer l'Auto 24/7"}
             >
               {isAuto ? (
                 <>
                   <CircleDot className="w-3 h-3 animate-pulse" />
-                  <span>Mode Auto 24/7</span>
-                  <Zap className="w-3 h-3" />
+                  <span className="hidden lg:inline">Auto 24/7</span>
                 </>
               ) : (
                 <>
                   <Handshake className="w-3 h-3" />
-                  <span>Mode Accompagné</span>
+                  <span className="hidden lg:inline">Accompagné</span>
                 </>
               )}
             </button>
@@ -299,158 +275,194 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
               <button
                 onClick={handleTriggerDaemon}
                 disabled={isTicking}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-all disabled:opacity-50"
-                title="Déclencher manuellement un cycle d'optimisation autonome"
+                className="p-1.5 rounded-md text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                title="Déclencher manuellement un cycle autonome"
               >
-                {isTicking ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                <span className="hidden sm:inline">Exécuter Cycle</span>
+                {isTicking ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Play className="w-3.5 h-3.5" />
+                )}
               </button>
             )}
-
-            {/* Daemon Autonomy Controller Settings */}
-            <button
-              onClick={() => setDaemonModalOpen(true)}
-              className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors border border-border/50"
-              title="Paramètres d'autonomie et limites de sécurité du Daemon 24/7"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-            </button>
           </div>
         )}
+      </div>
 
-        {/* Token Savings Tracker (0€ Cost) */}
+      {/* ── RIGHT: Status + User ── */}
+      <div className="flex items-center gap-2">
+        {/* Token Savings */}
         <TokenSavingsBadge />
 
-        {/* Assistance CLIs Pro */}
+        {/* CLI Status Badge */}
         <button
           onClick={onOpenCliSetup}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-sm ${
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
             hasCliAssociated
-              ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-              : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30"
+              ? "text-emerald-400 hover:bg-emerald-500/10"
+              : "text-amber-400 hover:bg-amber-500/10"
           }`}
-          title="Assistance de configuration Claude Pro & Antigravity CLI (0€)"
+          title={hasCliAssociated ? "CLIs Pro connectés (0€)" : "Associer vos CLIs Pro (0€)"}
         >
           <span
             className={`w-1.5 h-1.5 rounded-full ${
               hasCliAssociated ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
             }`}
           />
-          <Zap className={`w-3.5 h-3.5 ${hasCliAssociated ? "text-emerald-400" : "text-amber-400"}`} />
-          <span className="hidden sm:inline">
-            {hasCliAssociated ? "CLIs Pro (0€)" : "Associer CLIs (0€)"}
-          </span>
-        </button>
-
-        {/* Direct Terminal CloudCLI button */}
-        <button
-          onClick={() => {
-            setActiveCliTab("bash");
-            setCliPanelOpen(true);
-            setCliPanelMaximized(true);
-          }}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-semibold transition-all shadow-sm"
-          title="Ouvrir le terminal interactif CloudCLI"
-        >
-          <Terminal className="w-3.5 h-3.5 text-primary" />
-          <span className="hidden md:inline">Terminal</span>
+          <Zap className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">{hasCliAssociated ? "CLIs (0€)" : "Config CLIs"}</span>
         </button>
 
         {/* Notifications */}
-        <button className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
-          <Bell className="w-4 h-4" />
-          {notifications.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-primary rounded-full text-[9px] font-bold flex items-center justify-center text-primary-foreground">
-              {notifications.length}
-            </span>
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotifOpen((v) => !v)}
+            className="relative p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotifs > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-primary rounded-full text-[9px] font-bold flex items-center justify-center text-primary-foreground">
+                {unreadNotifs}
+              </span>
+            )}
+          </button>
+          {notifOpen && (
+            <div className="absolute right-0 mt-2 w-72 rounded-xl bg-card border border-border shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95">
+              <div className="px-3 py-2 border-b border-border/60">
+                <p className="text-xs font-semibold text-foreground">Notifications</p>
+              </div>
+              {notifications.length === 0 ? (
+                <p className="px-3 py-4 text-xs text-muted-foreground text-center">Aucune notification</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto">
+                  {notifications.slice().reverse().map((n) => (
+                    <div key={n.id} className="px-3 py-2 border-b border-border/40 last:border-0">
+                      <p className="text-xs font-medium text-foreground">{n.title}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{n.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-        </button>
+        </div>
 
-        {/* Settings */}
-        <button
-          onClick={onOpenSettings}
-          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-          title="Paramètres & Intégrations API"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+        {/* More actions (Settings + SkillsMP + Daemon) */}
+        <div className="relative" ref={moreMenuRef}>
+          <button
+            onClick={() => setMoreMenuOpen((v) => !v)}
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            title="Plus d'options"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          {moreMenuOpen && (
+            <div className="absolute right-0 mt-2 w-52 rounded-xl bg-card border border-border shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95">
+              <button
+                onClick={() => { setMoreMenuOpen(false); onOpenSettings?.(); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
+              >
+                <Settings className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span>Paramètres & Intégrations</span>
+              </button>
+              <button
+                onClick={() => { setMoreMenuOpen(false); setSkillsMpStoreOpen(true); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
+              >
+                <Store className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span>SkillsMP Store</span>
+              </button>
+              {selectedProject && (
+                <>
+                  <div className="border-t border-border/60 my-1" />
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); setDaemonModalOpen(true); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span>Paramètres Daemon 24/7</span>
+                  </button>
+                  <button
+                    onClick={() => { setMoreMenuOpen(false); fetchProjects(); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span>Actualiser les projets</span>
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* User Account / Auth & Admin Console */}
+        {/* Divider */}
+        <div className="h-5 w-px bg-border" />
+
+        {/* User Account */}
         {isAuthenticated && user ? (
           <div className="relative" ref={userMenuRef}>
             <button
               onClick={() => setUserMenuOpen((v) => !v)}
-              className="flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary border border-border transition-colors text-xs font-medium"
-              title={`Compte: ${user.name} (${user.role})`}
+              className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-lg hover:bg-secondary transition-colors"
+              title={`${user.name} · ${user.role}`}
             >
-              <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px]">
+              <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[11px] shrink-0">
                 {user.name.charAt(0).toUpperCase()}
               </div>
-              <span className="hidden sm:inline text-foreground max-w-[90px] truncate">
-                {user.name}
-              </span>
-              <span
-                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                  user.role === "ADMIN"
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                    : "bg-blue-500/20 text-blue-300 border-blue-500/40"
-                }`}
-              >
-                {user.role}
+              <span className="hidden sm:inline text-xs text-foreground font-medium max-w-[80px] truncate">
+                {user.name.split(" ")[0]}
               </span>
               <ChevronDown className="w-3 h-3 text-muted-foreground" />
             </button>
 
-            {/* User Dropdown Menu */}
             {userMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 rounded-xl bg-card border border-border shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95">
-                <div className="px-3 py-2 border-b border-border/60">
-                  <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <span
-                      className={`inline-block w-1.5 h-1.5 rounded-full ${
-                        user.status === "ACTIVE" ? "bg-emerald-400" : "bg-amber-400"
-                      }`}
-                    />
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      Statut: {user.status}
-                    </span>
+                {/* User info header */}
+                <div className="px-3 py-2.5 border-b border-border/60">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{user.name}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                    </div>
                   </div>
+                  <span
+                    className={`mt-2 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                      user.role === "ADMIN"
+                        ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                        : "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                    }`}
+                  >
+                    {user.role === "ADMIN" ? "👑 Administrateur" : "👤 Utilisateur"}
+                  </span>
                 </div>
 
                 {isAdmin && (
                   <button
-                    onClick={() => {
-                      setUserMenuOpen(false);
-                      setAdminConsoleOpen(true);
-                    }}
+                    onClick={() => { setUserMenuOpen(false); setAdminConsoleOpen(true); }}
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-amber-300 hover:bg-amber-500/10 transition-colors text-left"
                   >
-                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                     <span>Console Administration</span>
                   </button>
                 )}
 
                 <button
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    setChangePasswordOpen(true);
-                  }}
+                  onClick={() => { setUserMenuOpen(false); setChangePasswordOpen(true); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
                 >
                   <KeyRound className="w-3.5 h-3.5 text-primary shrink-0" />
                   <span>Changer mon mot de passe</span>
                 </button>
 
+                <div className="border-t border-border/60 my-1" />
                 <button
-                  onClick={async () => {
-                    setUserMenuOpen(false);
-                    await logout();
-                  }}
+                  onClick={async () => { setUserMenuOpen(false); await logout(); }}
                   className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors text-left"
                 >
-                  <LogOut className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                  <LogOut className="w-3.5 h-3.5 shrink-0" />
                   <span>Se Déconnecter</span>
                 </button>
               </div>
@@ -460,48 +472,20 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
           <button
             onClick={() => setAuthDialogOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-sm"
-            title="Connexion / Inscription à VibeFlow Studio"
           >
             <UserCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Se Connecter</span>
+            <span>Connexion</span>
           </button>
         )}
       </div>
 
-      {/* Auth Modal */}
-      <AuthDialog
-        isOpen={authDialogOpen}
-        onClose={() => setAuthDialogOpen(false)}
-      />
-
-      {/* Change Password Modal */}
-      <ChangePasswordModal
-        isOpen={changePasswordOpen}
-        onClose={() => setChangePasswordOpen(false)}
-      />
-
-      {/* Admin Console Modal */}
-      <AdminConsoleModal
-        isOpen={adminConsoleOpen}
-        onClose={() => setAdminConsoleOpen(false)}
-      />
-
-      {/* Daemon 24/7 Autonomy Controller Modal */}
-      <DaemonControllerModal
-        isOpen={daemonModalOpen}
-        onClose={() => setDaemonModalOpen(false)}
-      />
-
-      {/* Project Framing & Blueprint Guide */}
-      {framingGuideOpen && (
-        <ProjectFramingGuide onClose={() => setFramingGuideOpen(false)} />
-      )}
-
-      {/* SkillsMP Store Browser Modal */}
-      <SkillsMpStoreModal
-        isOpen={skillsMpStoreOpen}
-        onClose={() => setSkillsMpStoreOpen(false)}
-      />
+      {/* Modals */}
+      <AuthDialog isOpen={authDialogOpen} onClose={() => setAuthDialogOpen(false)} />
+      <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
+      <AdminConsoleModal isOpen={adminConsoleOpen} onClose={() => setAdminConsoleOpen(false)} />
+      <DaemonControllerModal isOpen={daemonModalOpen} onClose={() => setDaemonModalOpen(false)} />
+      {framingGuideOpen && <ProjectFramingGuide onClose={() => setFramingGuideOpen(false)} />}
+      <SkillsMpStoreModal isOpen={skillsMpStoreOpen} onClose={() => setSkillsMpStoreOpen(false)} />
     </header>
   );
 }

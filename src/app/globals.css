@@ -161,3 +161,65 @@
 .diff-modified {
   @apply bg-yellow-500/10 border-l-2 border-yellow-500;
 }
+
+/* Focus states accessibles */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+}
+
+/* Select native — dark theme */
+select option {
+  background: hsl(240 10% 6%);
+  color: hsl(0 0% 95%);
+}
+
+/* Smooth tab transitions */
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tab-content-enter {
+  animation: tab-in 0.15s ease-out;
+}
+
+/* Sidebar collapse arrow animation */
+@keyframes chevron-pulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
+/* Floating CLI button subtle glow */
+@keyframes float-glow {
+  0%, 100% { box-shadow: 0 4px 20px hsl(var(--primary) / 0.08); }
+  50%       { box-shadow: 0 4px 25px hsl(var(--primary) / 0.18); }
+}
+
+/* Empty state fade-in */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.empty-state-enter {
+  animation: fade-up 0.4s ease-out;
+}
+
+/* TopBar action button active state */
+.topbar-action-active {
+  @apply bg-primary/15 text-primary;
+}
+
+/* Notification badge pulse */
+@keyframes badge-pop {
+  0%   { transform: scale(0.8); }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.notification-badge {
+  animation: badge-pop 0.25s ease-out;
+}

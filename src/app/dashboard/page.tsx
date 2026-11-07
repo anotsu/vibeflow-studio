@@ -1,6 +1,6 @@
 // ============================================================
 // VibeFlow Studio — Dashboard Page (Main Workspace)
-// Real-time SSE integration, Settings modal & Reactive Updates
+// UX Refonte v2 — Inspiré Linear / Vercel / Cursor
 // ============================================================
 "use client";
 
@@ -8,12 +8,15 @@ import React, { useEffect, useState } from "react";
 import {
   LayoutGrid,
   GitCompareArrows,
-  Package,
+  Wrench,
+  TrendingUp,
   Plus,
   Loader2,
-  FolderGit2,
   Compass,
-  TrendingUp,
+  FolderGit2,
+  Rocket,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -33,27 +36,37 @@ import { CliSetupWizard } from "@/components/setup/CliSetupWizard";
 const WORKSPACE_TABS: Array<{
   id: WorkspaceTab;
   label: string;
+  shortLabel: string;
   icon: React.ReactNode;
+  description: string;
 }> = [
   {
     id: "kanban",
-    label: "Kanban & Tâches",
+    label: "Tâches",
+    shortLabel: "Tâches",
     icon: <LayoutGrid className="w-3.5 h-3.5" />,
+    description: "Suivi des tâches en flux Kanban",
   },
   {
     id: "arena",
-    label: "Arène Dual-Branch",
+    label: "Arène IA",
+    shortLabel: "Arène",
     icon: <GitCompareArrows className="w-3.5 h-3.5" />,
+    description: "Duel Claude × Antigravity sur vos branches",
   },
   {
     id: "toolbox",
-    label: "Boîte à Outils",
-    icon: <Package className="w-3.5 h-3.5" />,
+    label: "Outils",
+    shortLabel: "Outils",
+    icon: <Wrench className="w-3.5 h-3.5" />,
+    description: "Stack technique et dépendances du projet",
   },
   {
     id: "analytics",
-    label: "Analytics & Vélocité",
+    label: "Statistiques",
+    shortLabel: "Stats",
     icon: <TrendingUp className="w-3.5 h-3.5" />,
+    description: "Vélocité, économies et métriques",
   },
 ];
 
@@ -74,6 +87,8 @@ export default function DashboardPage() {
     setActiveWorkspaceTab,
     cliPanelPosition,
     cliPanelOpen,
+    sidebarOpen,
+    toggleSidebar,
     selectedProjectId,
     setSelectedProjectId,
     addNotification,
@@ -103,7 +118,7 @@ export default function DashboardPage() {
     }
   }, [projects, selectedProjectId, setSelectedProjectId]);
 
-  // ── Real-Time Server-Sent Events (SSE) Listener ─────────────
+  // ── Real-Time SSE Listener ─────────────────────────────────
   useEffect(() => {
     if (!selectedProjectId) return;
 
@@ -140,20 +155,27 @@ export default function DashboardPage() {
     };
   }, [selectedProjectId, fetchTasks, fetchDeployments, fetchToolbox, addNotification]);
 
+  // ── Loading State ──────────────────────────────────────────
   if (loading && projects.length === 0) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">
-            Chargement de VibeFlow Studio...
-          </p>
+          <div className="relative mx-auto mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+              <Rocket className="w-6 h-6 text-primary" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-background rounded-full flex items-center justify-center">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+            </div>
+          </div>
+          <p className="text-sm font-medium text-foreground">VibeFlow Studio</p>
+          <p className="text-xs text-muted-foreground mt-1">Chargement...</p>
         </div>
       </div>
     );
   }
 
-  // Empty state — no projects
+  // ── Empty State — No Projects ──────────────────────────────
   if (projects.length === 0 && !loading) {
     return (
       <div className="h-screen flex flex-col bg-background">
@@ -161,62 +183,93 @@ export default function DashboardPage() {
           onOpenSettings={() => setShowSettingsDialog(true)}
           onOpenCliSetup={() => setShowCliSetupWizard(true)}
         />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-              <LayoutGrid className="w-8 h-8 text-primary" />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-lg w-full">
+            {/* Hero Icon */}
+            <div className="flex justify-center mb-8">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center border border-primary/20 shadow-lg">
+                  <Rocket className="w-10 h-10 text-primary" />
+                </div>
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
+                  <span className="text-[10px]">✨</span>
+                </div>
+              </div>
             </div>
-            <h2 className="text-xl font-semibold mb-2">
-              Bienvenue dans VibeFlow Studio
-            </h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Créez votre premier projet pour commencer le VibeCoding avec
-              l&apos;orchestration duale Claude × Antigravity.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+
+            {/* Headline */}
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-foreground mb-2">
+                Bienvenue dans VibeFlow Studio
+              </h1>
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
+                Orchestrez Claude et Antigravity pour vos projets de VibeCoding.
+                Commencez par cadrer votre idée ou connectez un dépôt GitHub existant.
+              </p>
+            </div>
+
+            {/* Primary CTAs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
               <button
                 onClick={() => setShowFramingGuide(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-all shadow-md"
+                className="group flex flex-col items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-primary/10 to-purple-500/5 border border-primary/20 hover:border-primary/40 hover:bg-primary/15 transition-all shadow-sm text-left"
               >
-                <Compass className="w-4 h-4 text-purple-200" />
-                🧭 Cadrer un Nouveau Projet (Guide Pré-VibeCoding)
+                <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
+                  <Compass className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Nouveau projet</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Cadrer votre vision avec l&apos;IA
+                  </p>
+                </div>
               </button>
 
               <button
                 onClick={() => setShowCreateDialog(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-secondary text-foreground border border-border rounded-lg text-sm font-semibold hover:bg-secondary/80 transition-colors shadow-sm"
+                className="group flex flex-col items-start gap-3 p-4 rounded-xl bg-secondary border border-border hover:border-border/80 hover:bg-secondary/80 transition-all shadow-sm text-left"
               >
-                <FolderGit2 className="w-4 h-4" />
-                Lire un GitHub Existant
+                <div className="w-8 h-8 rounded-lg bg-card flex items-center justify-center group-hover:bg-secondary transition-colors border border-border">
+                  <FolderGit2 className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Dépôt GitHub</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Connecter un projet existant
+                  </p>
+                </div>
               </button>
+            </div>
+
+            {/* Features hint */}
+            <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                Orchestration duale Claude × Antigravity
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
+                0€ de tokens
+              </span>
             </div>
           </div>
         </div>
-        {showCreateDialog && (
-          <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />
-        )}
-        {showFramingGuide && (
-          <ProjectFramingGuide onClose={() => setShowFramingGuide(false)} />
-        )}
+
+        {showCreateDialog && <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />}
+        {showFramingGuide && <ProjectFramingGuide onClose={() => setShowFramingGuide(false)} />}
         {showSettingsDialog && (
           <SettingsDialog
             onClose={() => setShowSettingsDialog(false)}
             onOpenCliSetup={() => setShowCliSetupWizard(true)}
           />
         )}
-        <CliSetupWizard
-          isOpen={showCliSetupWizard}
-          onClose={() => setShowCliSetupWizard(false)}
-        />
-        {/* Terminal CloudCLI accessible even before project creation */}
-        {cliPanelOpen && <CloudCLI />}
-        {!cliPanelOpen && <CloudCLI />}
+        <CliSetupWizard isOpen={showCliSetupWizard} onClose={() => setShowCliSetupWizard(false)} />
+        <CloudCLI />
       </div>
     );
   }
 
-  const mainLayout =
-    cliPanelPosition === "bottom" ? "flex-col" : "flex-row";
+  const mainLayout = cliPanelPosition === "bottom" ? "flex-col" : "flex-row";
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -231,35 +284,70 @@ export default function DashboardPage() {
         {/* Left Sidebar — Vibe Guide & Roadmap */}
         <Sidebar />
 
+        {/* Sidebar Toggle (collapsed state) */}
+        {!sidebarOpen && (
+          <button
+            onClick={toggleSidebar}
+            className="flex items-center justify-center w-5 hover:w-6 border-r border-border bg-card/50 hover:bg-secondary transition-all shrink-0 group"
+            title="Ouvrir le panneau Vibe Guide"
+          >
+            <ChevronRight className="w-3 h-3 text-muted-foreground group-hover:text-foreground" />
+          </button>
+        )}
+
         {/* Center Workspace + CLI */}
         <div className={`flex-1 flex ${mainLayout} overflow-hidden`}>
           {/* Workspace */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Tab Bar */}
-            <div className="flex items-center border-b border-border px-4">
-              {WORKSPACE_TABS.map((tab) => (
+            <div className="flex items-center border-b border-border px-2 bg-card/30 shrink-0">
+              {/* Sidebar toggle when open */}
+              {sidebarOpen && (
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveWorkspaceTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
-                    activeWorkspaceTab === tab.id
-                      ? "text-primary border-primary"
-                      : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
-                  }`}
+                  onClick={toggleSidebar}
+                  className="p-1.5 mr-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                  title="Réduire le panneau Vibe Guide"
                 >
-                  {tab.icon}
-                  {tab.label}
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-              ))}
+              )}
 
-              {/* Action Buttons on right */}
-              <div className="ml-auto flex items-center gap-2">
+              {/* Tabs */}
+              <div className="flex items-center flex-1">
+                {WORKSPACE_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveWorkspaceTab(tab.id)}
+                    title={tab.description}
+                    className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                      activeWorkspaceTab === tab.id
+                        ? "text-primary border-primary"
+                        : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
+                    }`}
+                  >
+                    {tab.icon}
+                    <span className="hidden sm:inline">{tab.shortLabel}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Quick Actions right side */}
+              <div className="flex items-center gap-1 ml-auto">
+                <button
+                  onClick={() => setShowFramingGuide(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-md transition-colors"
+                  title="Cadrer un nouveau projet ou étape"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Cadrer</span>
+                </button>
                 <button
                   onClick={() => setShowCreateDialog(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 rounded-md transition-colors"
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/10 rounded-md transition-colors"
+                  title="Importer ou créer un projet"
                 >
-                  <FolderGit2 className="w-3.5 h-3.5" />
-                  <span>Importer / Nouveau projet</span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Projet</span>
                 </button>
               </div>
             </div>
@@ -273,37 +361,31 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* CloudCLI Panel */}
-          {cliPanelOpen && <CloudCLI />}
+          {/* CloudCLI Panel (right position) */}
+          {cliPanelPosition === "right" && cliPanelOpen && <CloudCLI />}
         </div>
+
+        {/* CloudCLI Panel (bottom position) */}
+        {cliPanelPosition === "bottom" && cliPanelOpen && (
+          <div className="shrink-0">
+            <CloudCLI />
+          </div>
+        )}
       </div>
 
-      {/* Floating CLI toggle when panel is closed */}
+      {/* Floating CloudCLI toggle when panel is closed */}
       {!cliPanelOpen && <CloudCLI />}
 
-      {/* Create Project Dialog */}
-      {showCreateDialog && (
-        <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />
-      )}
-
-      {/* Project Framing & Blueprint Guide */}
-      {showFramingGuide && (
-        <ProjectFramingGuide onClose={() => setShowFramingGuide(false)} />
-      )}
-
-      {/* Global Settings Dialog */}
+      {/* Dialogs */}
+      {showCreateDialog && <CreateProjectDialog onClose={() => setShowCreateDialog(false)} />}
+      {showFramingGuide && <ProjectFramingGuide onClose={() => setShowFramingGuide(false)} />}
       {showSettingsDialog && (
         <SettingsDialog
           onClose={() => setShowSettingsDialog(false)}
           onOpenCliSetup={() => setShowCliSetupWizard(true)}
         />
       )}
-
-      {/* Pro CLIs Setup & Diagnostics Wizard */}
-      <CliSetupWizard
-        isOpen={showCliSetupWizard}
-        onClose={() => setShowCliSetupWizard(false)}
-      />
+      <CliSetupWizard isOpen={showCliSetupWizard} onClose={() => setShowCliSetupWizard(false)} />
     </div>
   );
 }
