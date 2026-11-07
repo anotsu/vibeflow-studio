@@ -44,12 +44,17 @@ const globalAuthMemory = global as unknown as {
     ipAddress?: string | null;
     createdAt: Date;
   }>;
+  __vibeflowResetTokens?: Map<
+    string,
+    { email: string; token: string; code: string; expiresAt: Date; used: boolean }
+  >;
 };
 
 if (!globalAuthMemory.__vibeflowUsers) {
   globalAuthMemory.__vibeflowUsers = new Map<string, MemoryUser>();
   globalAuthMemory.__vibeflowSessions = new Map();
   globalAuthMemory.__vibeflowAuditLogs = [];
+  globalAuthMemory.__vibeflowResetTokens = new Map();
 
   // Seed default Admin: admin@vibeflow.local / AdminVibe2026!
   const adminSalt = crypto.randomBytes(16).toString("hex");
@@ -96,6 +101,7 @@ if (!globalAuthMemory.__vibeflowUsers) {
 const memoryUsers = globalAuthMemory.__vibeflowUsers;
 const memorySessions = globalAuthMemory.__vibeflowSessions!;
 const memoryAuditLogs = globalAuthMemory.__vibeflowAuditLogs!;
+const memoryResetTokens = globalAuthMemory.__vibeflowResetTokens!;
 
 /**
  * Hashes a plaintext password using scrypt.
@@ -328,3 +334,254 @@ export const memoryAuth = {
     return memoryUsers.delete(id);
   },
 };
+
+// ────────────────────────────────────────────────────────────
+// Password Change & Reset Token Engine
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Creates a password reset token and 6-digit verification code.
+ */
+export async function createPasswordResetToken(
+  email: string
+): Promise<{ token: string; code: string; expiresAt: Date }> {
+  const token = `rst_${crypto.randomBytes(24).toString("hex")}`;
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  // Store in memory
+  memoryResetTokens.set(token, {
+    email,
+    token,
+    code,
+    expiresAt,
+    used: false,
+  });
+  memoryResetTokens.set(code, {
+    email,
+    token,
+    code,
+    expiresAt,
+    used: false,
+  });
+
+  // Store in database
+  try {
+    await prisma.passwordResetToken.create({
+      data: {
+        email,
+        token,
+        code,
+        expiresAt,
+      },
+    });
+  } catch {}
+
+  await logAuditEvent({
+    action: "PASSWORD_RESET_REQUESTED",
+    category: "AUTH",
+    details: `Demande de réinitialisation pour ${email}`,
+  });
+
+  return { token, code, expiresAt };
+}
+
+/**
+ * Validates a password reset token or 6-digit code.
+ */
+export async function verifyPasswordResetToken(
+  tokenOrCode: string
+): Promise<{ valid: boolean; email?: string }> {
+  const clean = tokenOrCode.trim();
+
+  // Try Prisma first
+  try {
+    const record = await prisma.passwordResetToken.findFirst({
+      where: {
+        OR: [{ token: clean }, { code: clean }],
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (record) {
+      return { valid: true, email: record.email };
+    }
+  } catch {}
+
+  // Fallback to memory
+  const mem = memoryResetTokens.get(clean);
+  if (mem && !mem.used && mem.expiresAt > new Date()) {
+    return { valid: true, email: mem.email };
+  }
+
+  return { valid: false };
+}
+
+/**
+ * Consumes a password reset token and updates the user's password.
+ */
+export async function consumePasswordResetToken(
+  tokenOrCode: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!newPassword || newPassword.length < 8) {
+    return { success: false, error: "Le mot de passe doit contenir au moins 8 caractères." };
+  }
+
+  const verification = await verifyPasswordResetToken(tokenOrCode);
+  if (!verification.valid || !verification.email) {
+    return { success: false, error: "Jeton ou code de réinitialisation invalide ou expiré." };
+  }
+
+  const email = verification.email;
+  const { salt, hash } = hashPassword(newPassword);
+
+  // Update in database
+  try {
+    await prisma.user.update({
+      where: { email },
+      data: {
+        passwordHash: hash,
+        salt: salt,
+      },
+    });
+    await prisma.passwordResetToken.updateMany({
+      where: { email },
+      data: { used: true },
+    });
+  } catch {}
+
+  // Update in memory
+  const memUser = memoryAuth.findUserByEmail(email);
+  if (memUser) {
+    memoryAuth.updateUser(memUser.id, {
+      passwordHash: hash,
+      salt: salt,
+    });
+  }
+  const clean = tokenOrCode.trim();
+  const memToken = memoryResetTokens.get(clean);
+  if (memToken) {
+    memToken.used = true;
+  }
+
+  await logAuditEvent({
+    action: "PASSWORD_RESET_SUCCESS",
+    category: "AUTH",
+    details: `Mot de passe réinitialisé pour ${email}`,
+  });
+
+  return { success: true };
+}
+
+/**
+ * Allows an authenticated user to change their own password by verifying the old one.
+ */
+export async function changeUserPassword(
+  userId: string,
+  oldPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!newPassword || newPassword.length < 8) {
+    return { success: false, error: "Le nouveau mot de passe doit contenir au moins 8 caractères." };
+  }
+
+  // 1. Try DB
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      const isMatch = verifyPassword(oldPassword, user.passwordHash, user.salt);
+      if (!isMatch) {
+        return { success: false, error: "Mot de passe actuel incorrect." };
+      }
+      const { salt, hash } = hashPassword(newPassword);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash: hash, salt },
+      });
+
+      await logAuditEvent({
+        userId,
+        action: "PASSWORD_CHANGED",
+        category: "AUTH",
+        details: `L'utilisateur ${user.email} a modifié son mot de passe`,
+      });
+
+      return { success: true };
+    }
+  } catch {}
+
+  // 2. Fallback memory
+  const memUser = memoryUsers.get(userId);
+  if (!memUser) {
+    return { success: false, error: "Utilisateur non trouvé." };
+  }
+  const isMatch = verifyPassword(oldPassword, memUser.passwordHash, memUser.salt);
+  if (!isMatch) {
+    return { success: false, error: "Mot de passe actuel incorrect." };
+  }
+  const { salt, hash } = hashPassword(newPassword);
+  memUser.passwordHash = hash;
+  memUser.salt = salt;
+
+  await logAuditEvent({
+    userId,
+    action: "PASSWORD_CHANGED",
+    category: "AUTH",
+    details: `L'utilisateur ${memUser.email} a modifié son mot de passe (mémoire)`,
+  });
+
+  return { success: true };
+}
+
+/**
+ * Allows an administrator to reset any user's password directly.
+ */
+export async function adminResetPassword(
+  targetUserId: string,
+  newPassword: string,
+  adminUserId?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!newPassword || newPassword.length < 8) {
+    return { success: false, error: "Le mot de passe doit contenir au moins 8 caractères." };
+  }
+
+  const { salt, hash } = hashPassword(newPassword);
+
+  // 1. Try DB
+  try {
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (user) {
+      await prisma.user.update({
+        where: { id: targetUserId },
+        data: { passwordHash: hash, salt },
+      });
+
+      await logAuditEvent({
+        userId: adminUserId,
+        action: "ADMIN_RESET_PASSWORD",
+        category: "ADMIN",
+        details: `Réinitialisation administrative du mot de passe pour ${user.email}`,
+      });
+
+      return { success: true };
+    }
+  } catch {}
+
+  // 2. Memory fallback
+  const memUser = memoryUsers.get(targetUserId);
+  if (!memUser) {
+    return { success: false, error: "Utilisateur non trouvé." };
+  }
+  memUser.passwordHash = hash;
+  memUser.salt = salt;
+
+  await logAuditEvent({
+    userId: adminUserId,
+    action: "ADMIN_RESET_PASSWORD",
+    category: "ADMIN",
+    details: `Réinitialisation administrative du mot de passe pour ${memUser.email} (mémoire)`,
+  });
+
+  return { success: true };
+}

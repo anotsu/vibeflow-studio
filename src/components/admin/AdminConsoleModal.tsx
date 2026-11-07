@@ -30,6 +30,10 @@ import {
   Check,
   UserCheck,
   UserX,
+  Mail,
+  Send,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
@@ -41,7 +45,7 @@ interface AdminConsoleModalProps {
   onClose: () => void;
 }
 
-type AdminTab = "users" | "audit" | "system";
+type AdminTab = "users" | "audit" | "system" | "smtp";
 
 export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
   const { addNotification } = useUIStore();
@@ -53,6 +57,33 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // SMTP Settings state
+  const [smtpForm, setSmtpForm] = useState({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    user: "",
+    password: "",
+    from: "VibeFlow Studio <noreply@vibeflow.local>",
+    enabled: false,
+  });
+  const [testEmail, setTestEmail] = useState("");
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [showSmtpPassword, setShowSmtpPassword] = useState(false);
+  const [smtpTestResult, setSmtpTestResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: string;
+  } | null>(null);
+
+  // Admin password reset modal for a specific user
+  const [resetUserModal, setResetUserModal] = useState<{
+    user: SafeUser;
+    newPassword: string;
+  } | null>(null);
+  const [resettingUserPassword, setResettingUserPassword] = useState(false);
 
   // New user form state
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -100,9 +131,26 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
     } catch {}
   };
 
+  const fetchSmtpConfig = async () => {
+    try {
+      const res = await fetch("/api/admin/smtp");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.config) {
+          setSmtpForm(data.config);
+        }
+      }
+    } catch {}
+  };
+
   const loadData = async () => {
     setLoading(true);
-    await Promise.all([fetchUsers(), fetchAuditLogs(auditCategory), fetchSystemHealth()]);
+    await Promise.all([
+      fetchUsers(),
+      fetchAuditLogs(auditCategory),
+      fetchSystemHealth(),
+      fetchSmtpConfig(),
+    ]);
     setLoading(false);
   };
 
@@ -111,6 +159,130 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
       loadData();
     }
   }, [isOpen]);
+
+  const handleSaveSmtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSmtp(true);
+    try {
+      const res = await fetch("/api/admin/smtp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save", config: smtpForm }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addNotification({
+          type: "success",
+          title: "Configuration enregistrée",
+          message: data.message,
+          autoDismissMs: 3500,
+        });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur enregistrement",
+        message: err.message,
+        autoDismissMs: 3500,
+      });
+    } finally {
+      setSavingSmtp(false);
+    }
+  };
+
+  const handleTestSmtp = async () => {
+    setTestingSmtp(true);
+    setSmtpTestResult(null);
+    try {
+      const res = await fetch("/api/admin/smtp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test",
+          testEmail: testEmail || currentAdmin?.email,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSmtpTestResult({
+          success: true,
+          message: data.message,
+          details: data.details,
+        });
+        addNotification({
+          type: "success",
+          title: "Test SMTP réussi !",
+          message: data.message,
+          autoDismissMs: 4000,
+        });
+      } else {
+        setSmtpTestResult({
+          success: false,
+          message: data.error || "Échec de connexion",
+          details: data.details,
+        });
+        addNotification({
+          type: "error",
+          title: "Échec test SMTP",
+          message: data.error,
+          autoDismissMs: 4000,
+        });
+      }
+    } catch (err: any) {
+      setSmtpTestResult({
+        success: false,
+        message: err.message,
+      });
+    } finally {
+      setTestingSmtp(false);
+    }
+  };
+
+  const handleAdminResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetUserModal) return;
+    if (resetUserModal.newPassword.length < 8) {
+      addNotification({
+        type: "error",
+        title: "Mot de passe trop court",
+        message: "Le mot de passe doit comporter au moins 8 caractères.",
+        autoDismissMs: 3000,
+      });
+      return;
+    }
+
+    setResettingUserPassword(true);
+    try {
+      const res = await fetch(`/api/admin/users/${resetUserModal.user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: resetUserModal.newPassword }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addNotification({
+          type: "success",
+          title: "Mot de passe réinitialisé",
+          message: `Le mot de passe pour ${resetUserModal.user.email} a été mis à jour.`,
+          autoDismissMs: 4000,
+        });
+        setResetUserModal(null);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur réinitialisation",
+        message: err.message,
+        autoDismissMs: 3500,
+      });
+    } finally {
+      setResettingUserPassword(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -320,6 +492,18 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
             <Activity className="w-3.5 h-3.5" />
             <span>Santé Système &amp; Worktrees</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("smtp")}
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${
+              activeTab === "smtp"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Messagerie &amp; SMTP</span>
+          </button>
         </div>
 
         {/* Main Tab Content */}
@@ -457,6 +641,15 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
                                     ) : (
                                       <UserCheck className="w-3.5 h-3.5" />
                                     )}
+                                  </button>
+
+                                  {/* Reset Password */}
+                                  <button
+                                    onClick={() => setResetUserModal({ user: u, newPassword: "" })}
+                                    className="p-1.5 rounded text-blue-400 hover:bg-blue-400/10 transition-colors"
+                                    title="Réinitialiser le mot de passe de cet utilisateur"
+                                  >
+                                    <KeyRound className="w-3.5 h-3.5" />
                                   </button>
 
                                   {/* Delete */}
@@ -642,6 +835,208 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
               )}
             </>
           )}
+
+          {/* TAB 4: SMTP CONFIGURATION */}
+          {activeTab === "smtp" && (
+            <div className="space-y-6">
+              {/* Header card */}
+              <div className="p-4 rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-purple-500/10 to-transparent flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-primary/20 text-primary border border-primary/30 shrink-0 mt-0.5">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">
+                      Configuration du Serveur de Messagerie (SMTP)
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+                      Permet l&apos;envoi d&apos;emails pour la réinitialisation de mot de passe, les alertes de sécurité, et les notifications d&apos;auto-guérison Coolify.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={smtpForm.enabled}
+                      onChange={(e) => setSmtpForm({ ...smtpForm, enabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-secondary peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                  </label>
+                  <span className={`text-xs font-bold ${smtpForm.enabled ? "text-emerald-400" : "text-muted-foreground"}`}>
+                    {smtpForm.enabled ? "Actif" : "Désactivé"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Settings Form */}
+              <form onSubmit={handleSaveSmtp} className="p-5 rounded-xl border border-border bg-card space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="md:col-span-2">
+                    <label className="block font-semibold mb-1 text-foreground">Hôte SMTP (Serveur)</label>
+                    <input
+                      type="text"
+                      required
+                      value={smtpForm.host}
+                      onChange={(e) => setSmtpForm({ ...smtpForm, host: e.target.value })}
+                      placeholder="ex: smtp.gmail.com, mail.capstation.fr"
+                      className="w-full bg-secondary text-foreground rounded-lg p-2.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold mb-1 text-foreground">Port SMTP</label>
+                    <input
+                      type="number"
+                      required
+                      value={smtpForm.port}
+                      onChange={(e) => setSmtpForm({ ...smtpForm, port: Number(e.target.value) })}
+                      placeholder="587"
+                      className="w-full bg-secondary text-foreground rounded-lg p-2.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block font-semibold mb-1 text-foreground">Utilisateur / Login SMTP</label>
+                    <input
+                      type="text"
+                      value={smtpForm.user}
+                      onChange={(e) => setSmtpForm({ ...smtpForm, user: e.target.value })}
+                      placeholder="ex: apikey ou utilisateur@domaine.com"
+                      className="w-full bg-secondary text-foreground rounded-lg p-2.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block font-semibold text-foreground">Mot de passe SMTP</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowSmtpPassword(!showSmtpPassword)}
+                        className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      >
+                        {showSmtpPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showSmtpPassword ? "Masquer" : "Voir"}</span>
+                      </button>
+                    </div>
+                    <input
+                      type={showSmtpPassword ? "text" : "password"}
+                      value={smtpForm.password}
+                      onChange={(e) => setSmtpForm({ ...smtpForm, password: e.target.value })}
+                      placeholder="••••••••••••"
+                      className="w-full bg-secondary text-foreground rounded-lg p-2.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block font-semibold mb-1 text-foreground">Adresse Expéditeur (&quot;De&quot;)</label>
+                    <input
+                      type="text"
+                      required
+                      value={smtpForm.from}
+                      onChange={(e) => setSmtpForm({ ...smtpForm, from: e.target.value })}
+                      placeholder="VibeFlow Studio &lt;noreply@vibeflow.local&gt;"
+                      className="w-full bg-secondary text-foreground rounded-lg p-2.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+
+                  <div className="flex items-center pt-5">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs">
+                      <input
+                        type="checkbox"
+                        checked={smtpForm.secure}
+                        onChange={(e) => setSmtpForm({ ...smtpForm, secure: e.target.checked })}
+                        className="rounded border-border text-primary focus:ring-primary w-4 h-4"
+                      />
+                      <span className="font-semibold text-foreground">Connexion sécurisée SSL / TLS (obligatoire pour port 465)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingSmtp}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground font-bold text-xs rounded-xl hover:bg-primary/90 transition-all shadow-md disabled:opacity-50"
+                  >
+                    {savingSmtp ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                    <span>Enregistrer la Configuration SMTP</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* Direct SMTP Test Card */}
+              <div className="p-5 rounded-xl border border-border bg-secondary/30 space-y-4">
+                <div>
+                  <h4 className="text-xs font-bold text-foreground flex items-center gap-2">
+                    <Send className="w-4 h-4 text-primary" />
+                    Tester la Connexion SMTP &amp; Envoi d&apos;Email en Direct
+                  </h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Envoyez un email de test pour valider la connectivité réseau, la négociation TLS et les identifiants.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <input
+                    type="email"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    placeholder={currentAdmin?.email || "admin@vibeflow.local"}
+                    className="w-full sm:flex-1 bg-card text-foreground rounded-lg p-2.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTestSmtp}
+                    disabled={testingSmtp || !smtpForm.host}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs border border-border flex items-center justify-center gap-2 transition-all disabled:opacity-50 shrink-0"
+                  >
+                    {testingSmtp ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4 text-primary" />
+                    )}
+                    <span>Tester la connexion</span>
+                  </button>
+                </div>
+
+                {/* Test results banner */}
+                {smtpTestResult && (
+                  <div
+                    className={`p-4 rounded-xl border text-xs animate-in fade-in ${
+                      smtpTestResult.success
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                        : "bg-red-500/10 border-red-500/30 text-red-400"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-bold">
+                      {smtpTestResult.success ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4" />
+                      )}
+                      <span>{smtpTestResult.message}</span>
+                    </div>
+                    {smtpTestResult.details && (
+                      <pre className="mt-2 text-[11px] font-mono whitespace-pre-wrap opacity-80 overflow-x-auto">
+                        {smtpTestResult.details}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -739,6 +1134,74 @@ export function AdminConsoleModal({ isOpen, onClose }: AdminConsoleModalProps) {
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     )}
                     <span>Enregistrer</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* Reset User Password Sub-Modal */}
+        {resetUserModal && (
+          <div className="absolute inset-0 z-20 bg-black/75 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in">
+            <div className="bg-card border border-border rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-primary" />
+                  <h4 className="text-xs font-bold text-foreground">
+                    Réinitialiser le mot de passe
+                  </h4>
+                </div>
+                <button
+                  onClick={() => setResetUserModal(null)}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAdminResetPassword} className="space-y-4 text-xs">
+                <p className="text-xs text-muted-foreground">
+                  Définissez un nouveau mot de passe pour l&apos;utilisateur{" "}
+                  <strong className="text-foreground">{resetUserModal.user.name}</strong> ({resetUserModal.user.email}).
+                </p>
+
+                <div>
+                  <label className="block font-semibold mb-1">Nouveau mot de passe</label>
+                  <input
+                    type="password"
+                    required
+                    autoFocus
+                    value={resetUserModal.newPassword}
+                    onChange={(e) =>
+                      setResetUserModal({
+                        ...resetUserModal,
+                        newPassword: e.target.value,
+                      })
+                    }
+                    placeholder="Au moins 8 caractères"
+                    className="w-full bg-secondary text-foreground rounded-lg p-2.5 border border-border focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setResetUserModal(null)}
+                    className="px-3.5 py-2 bg-secondary text-foreground rounded-xl font-semibold"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resettingUserPassword || resetUserModal.newPassword.length < 8}
+                    className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl hover:bg-primary/90 flex items-center gap-2 shadow-md disabled:opacity-50"
+                  >
+                    {resettingUserPassword ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    <span>Mettre à jour</span>
                   </button>
                 </div>
               </form>

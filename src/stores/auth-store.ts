@@ -17,6 +17,24 @@ interface AuthState {
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<SafeUser>) => void;
+  forgotPassword: (
+    email: string
+  ) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    sent?: boolean;
+    code?: string;
+    directLink?: string;
+  }>;
+  resetPassword: (
+    tokenOrCode: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; message?: string; error?: string }>;
+  changePassword: (
+    oldPassword: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; message?: string; error?: string }>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -114,6 +132,63 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: updated,
         isAdmin: updated.role === "ADMIN",
       });
+    }
+  },
+
+  forgotPassword: async (email: string) => {
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Échec de la demande." };
+      }
+      return {
+        success: true,
+        message: data.message,
+        sent: data.sent,
+        code: data.code,
+        directLink: data.directLink,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Erreur réseau." };
+    }
+  },
+
+  resetPassword: async (tokenOrCode: string, newPassword: string) => {
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenOrCode, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Impossible de réinitialiser le mot de passe." };
+      }
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Erreur réseau." };
+    }
+  },
+
+  changePassword: async (oldPassword: string, newPassword: string) => {
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Impossible de modifier le mot de passe." };
+      }
+      return { success: true, message: data.message };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Erreur réseau." };
     }
   },
 }));

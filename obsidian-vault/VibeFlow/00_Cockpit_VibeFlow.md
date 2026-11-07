@@ -111,7 +111,9 @@ SORT created DESC
 | **Marketplace Skills & Personas** | `src/lib/agent-skills.ts` | Personas personnalisés et compétences métiers (OWASP, 60fps, WCAG) |
 | **Store SkillsMP & Recommandations** | `src/lib/skillsmp-client.ts` | Marketplace de compétences IA (skillsmp.com) & recommandations au cadrage |
 | **Sécurité & Droits (RBAC)** | `src/lib/auth.ts` | Authentification scrypt, sessions HttpOnly, rôles USER/ADMIN, AuditLog & Guards |
-| **Console d'Administration** | `src/components/admin/AdminConsoleModal.tsx` | Gestion des comptes, rôles, statuts, journaux d'audit et santé worktrees |
+| **Service Messagerie & SMTP** | `src/lib/mailer.ts` | Dispatcher d'emails transactionnels, templates HTML responsive, test SMTP en direct & fallback |
+| **Gestion des Mots de Passe** | `src/components/auth/ChangePasswordModal.tsx` | Libre-service changement de mot de passe, flux mot de passe oublié & reset admin |
+| **Console d'Administration** | `src/components/admin/AdminConsoleModal.tsx` | Gestion comptes, rôles, statuts, journaux audit, santé worktrees & config SMTP |
 | **Identité Visuelle & Icônes** | `src/components/brand/VibeFlowLogo.tsx` | Logo vectoriel SVG multi-tailles, favicons (SVG, ICO, PNG 16/32/180/192/512) et PWA manifest |
 | **Vision IA & Pixel Diff** | `src/lib/vision-reviewer.ts` | Comparateur pixel par pixel Sharp, annotations de hotspots, curseur Wipe & audit WCAG |
 | **Spécifications BDD (Gherkin)** | `src/components/kanban/TaskSpecificationModal.tsx` | Cahier des charges Gherkin interactif, critères d'acceptation & lancement duel 1-clic |

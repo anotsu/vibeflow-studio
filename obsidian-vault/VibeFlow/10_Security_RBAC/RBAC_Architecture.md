@@ -147,6 +147,24 @@ model AuditLog {
   userAgent String?
   createdAt DateTime @default(now())
 }
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  code      String   // Code de vérification à 6 chiffres
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String   // Stockage sérialisé JSON (ex: configuration SMTP)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
 ```
 
 ---
@@ -184,11 +202,15 @@ sequenceDiagram
 - `POST /api/auth/login` : Authentification, génération de session, cookie `vibeflow_session` et log d'audit.
 - `POST /api/auth/logout` : Révocation de session et purge du cookie.
 - `GET /api/auth/me` : Données du compte connecté (`SafeUser`).
-- `PATCH /api/auth/me` : Modification du profil et changement de mot de passe personnel.
+- `POST /api/auth/change-password` : Changement autonome du mot de passe utilisateur (vérification préalable de l'ancien mot de passe via `crypto.timingSafeEqual`).
+- `POST /api/auth/forgot-password` : Demande de réinitialisation avec génération d'un token sécurisé (256-bit) et code court à 6 chiffres (validité 1h) ; expédition par email SMTP ou mode de secours direct.
+- `POST /api/auth/reset-password` : Validation du token/code et attribution du nouveau mot de passe haché par scrypt.
 - `GET /api/admin/users` : Liste exhaustive des utilisateurs avec statut, rôle, nombre de projets et dernière connexion.
 - `POST /api/admin/users` : Création administrative directe d'un compte.
-- `PATCH /api/admin/users/[id]` : Modification du rôle (`USER` $\leftrightarrow$ `ADMIN`), statut (`ACTIVE` $\leftrightarrow$ `SUSPENDED`) ou réinitialisation de mot de passe.
+- `PATCH /api/admin/users/[id]` : Modification du rôle (`USER` $\leftrightarrow$ `ADMIN`), statut (`ACTIVE` $\leftrightarrow$ `SUSPENDED`) ou réinitialisation directe par l'administrateur.
 - `DELETE /api/admin/users/[id]` : Suppression d'un compte (avec garde-fou interdisant l'auto-suppression de l'admin connecté).
+- `GET /api/admin/smtp` : Consultation de la configuration SMTP actuelle (mots de passe masqués).
+- `POST /api/admin/smtp` : Sauvegarde des paramètres du serveur de messagerie et déclenchement d'un email de test avec diagnostic en direct.
 - `GET /api/admin/audit-logs` : Consultation chronologique des journaux d'audit avec filtrage catégoriel.
 - `GET /api/admin/system` : Rapport de santé hôte (CPU, RAM, Uptime, version Node, statut PostgreSQL, liste des worktrees actifs).
 - `POST /api/admin/system` : Déclenchement de la purge des dossiers `/tmp/vibeflow-worktrees/` ou test de latence base de données.
@@ -199,15 +221,21 @@ sequenceDiagram
 
 1. **TopBar Interactive (`src/components/layout/TopBar.tsx`)** :
    - Affichage de l'avatar utilisateur avec badge de rôle dynamique : `ADMIN` en doré (`bg-amber-500/20 text-amber-300`) ou `USER` en bleu (`bg-blue-500/20 text-blue-300`).
-   - Menu déroulant avec informations du profil, indicateur de statut en temps réel, lien d'accès à la **Console d'Administration** (visible uniquement pour les administrateurs) et bouton de déconnexion.
+   - Menu déroulant avec informations du profil, indicateur de statut en temps réel, lien d'accès à la **Console d'Administration** (visible uniquement pour les administrateurs).
+   - Accès direct au bouton **"Changer mon mot de passe"** ouvrant la modale dédiée `<ChangePasswordModal />`.
+   - Bouton de déconnexion immédiate.
    - Bouton "Se Connecter" avec ouverture de la boîte de dialogue si l'utilisateur est invité.
 2. **Boîte d'Authentification (`src/components/auth/AuthDialog.tsx`)** :
-   - Onglets "Connexion" et "Inscription".
-   - Bouton d'accès rapide en environnement de test (1-clic pour remplir les identifiants Admin ou Dev par défaut).
-3. **Console d'Administration Complète (`src/components/admin/AdminConsoleModal.tsx`)** :
-   - **Onglet 1 : Utilisateurs & Droits** : Tableau de bord des comptes, promotion/rétrogradation instantanée de rôle, suspension en un clic, réinitialisation de mot de passe et suppression protégée.
+   - Vues commutables : **Connexion**, **Inscription**, **Mot de passe oublié** et **Nouveau mot de passe**.
+   - Flux de réinitialisation sans friction : saisie de l'email, réception du code de sécurité à 6 chiffres, attribution du nouveau mot de passe avec jauge de validation.
+   - En environnement de test ou si SMTP est désactivé, le code de validation et le lien direct sont affichés directement dans la modale pour une validation instantanée.
+3. **Modale Changement de Mot de Passe (`src/components/auth/ChangePasswordModal.tsx`)** :
+   - Formulaire dédié pour l'utilisateur connecté avec contrôle de l'ancien mot de passe, confirmation du nouveau mot de passe (8+ caractères) et messages de retour contextuels.
+4. **Console d'Administration Complète (`src/components/admin/AdminConsoleModal.tsx`)** :
+   - **Onglet 1 : Utilisateurs & Droits** : Tableau de bord des comptes, promotion/rétrogradation instantanée de rôle, suspension en un clic, bouton dédié **"Réinitialiser le mot de passe"** pour forcer un nouveau mot de passe sur n'importe quel compte cible, et suppression protégée.
    - **Onglet 2 : Journaux d'Audit** : Visualisation en direct de tous les événements avec pastilles de sévérité et métadonnées JSON détaillées.
    - **Onglet 3 : Santé Système & Worktrees** : Métriques système en direct (RAM utilisée, cœurs CPU, latence DB, nombre de worktrees actifs) et bouton de purge complète des worktrees orphelins.
+   - **Onglet 4 : Messagerie & SMTP** : Formulaire de configuration complet (Hôte SMTP, Port 25/465/587, Sécurité SSL/TLS, Identifiant, Mot de passe masqué, Adresse d'expédition, Interrupteur d'activation) et outil d'envoi d'email de test avec rapport d'analyse de connexion en direct.
 
 ---
 
@@ -220,3 +248,59 @@ sequenceDiagram
 
 > [!TIP]
 > Lors du premier lancement en production sur une base de données vierge, le premier compte créé via le formulaire d'inscription se voit automatiquement attribuer le rôle **ADMIN**. Tous les comptes suivants sont créés avec le rôle **USER** par défaut.
+
+---
+
+## 7. Gestion des Mots de Passe & Procédure "Mot de Passe Oublié"
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 👤 Utilisateur
+    participant UI as 💻 AuthDialog / ChangePasswordModal
+    participant AuthAPI as ⚡ API Auth (/api/auth/...)
+    participant Mailer as 📧 Service Mailer (Nodemailer)
+    participant SMTP as 🌐 Serveur SMTP
+    participant DB as 🗄️ PostgreSQL / Cache Mémoire
+
+    alt 1. Changement de mot de passe par l'utilisateur connecté
+        User->>UI: Saisit Ancien Mot de Passe + Nouveau Mot de Passe
+        UI->>AuthAPI: POST /api/auth/change-password
+        AuthAPI->>DB: Vérification scrypt de l'ancien mot de passe
+        AuthAPI->>DB: Mise à jour avec le nouveau hash scrypt
+        AuthAPI-->>UI: 200 OK + Journal d'audit créé
+    else 2. Demande "Mot de passe oublié"
+        User->>UI: Saisit son adresse email
+        UI->>AuthAPI: POST /api/auth/forgot-password
+        AuthAPI->>DB: Génère Token aléatoire + Code 6 chiffres (1h expiry)
+        alt SMTP Activé & Connecté
+            AuthAPI->>Mailer: sendPasswordResetEmail(email, token, code)
+            Mailer->>SMTP: Envoi message HTML responsive
+            AuthAPI-->>UI: 200 OK ("Code envoyé par email")
+        else SMTP Inactif / Non joignable (Fallback)
+            AuthAPI-->>UI: 200 OK + Code 6 chiffres & Lien retournés directement
+        end
+        User->>UI: Saisit le Code à 6 chiffres + Nouveau mot de passe
+        UI->>AuthAPI: POST /api/auth/reset-password
+        AuthAPI->>DB: Validation du token/code non expiré et non utilisé
+        AuthAPI->>DB: Invalidation du token (used=true) & Enregistrement nouveau hash
+        AuthAPI-->>UI: 200 OK (Mot de passe réinitialisé)
+    else 3. Réinitialisation administrative
+        User->>UI: Admin clique sur "Réinitialiser mot de passe"
+        UI->>AuthAPI: PATCH /api/admin/users/:id { password: "NouveauMotDePasse" }
+        AuthAPI->>DB: Hash scrypt + logAuditEvent("USER_PASSWORD_RESET_BY_ADMIN")
+        AuthAPI-->>UI: 200 OK
+    end
+```
+
+---
+
+## 8. Configuration de Messagerie & Serveur SMTP
+
+Le module de messagerie transactionnelle (`src/lib/mailer.ts`) intègre les fonctionnalités suivantes :
+
+1. **Compatibilité Standardisée (Nodemailer)** : Prise en charge universelle des serveurs SMTP d'entreprise (Port 25/587 STARTTLS ou Port 465 SSL/TLS direct) ainsi que des fournisseurs cloud (Postmark, SendGrid, Amazon SES, Brevo, Mailgun).
+2. **Stockage Persistant & Masquage de Clé** : Les paramètres SMTP sont conservés dans la table PostgreSQL `SystemSetting` sous la clé `smtp_config` (ou en cache mémoire global résilient). Les mots de passe ne sont jamais renvoyés en clair dans les réponses API (`••••••••`).
+3. **Template Responsive avec Charte VibeFlow** : L'email de réinitialisation est généré avec un design moderne (dégradé violet/indigo, logo VibeFlow Studio, boîte d'affichage du code à 6 chiffres en grand format, bouton d'action directe et avertissement de sécurité sur l'expiration d'une heure).
+4. **Diagnostic & Test d'Envoi en Direct** : Depuis l'onglet "Messagerie & SMTP" de la console d'administration, les administrateurs peuvent tester la connectivité SMTP en temps réel avec message de diagnostic précis (authentification, port bloqué, timeout) et envoi d'un email de test.
+5. **Autonomie Totale (Mode Sans Serveur Mail)** : Pour éviter tout blocage en environnement de développement local ou sur un serveur isolé, si le serveur SMTP n'est pas configuré ou désactivé, le système active automatiquement un mode Fallback fournissant immédiatement le code et le lien de validation à l'utilisateur dans l'interface.

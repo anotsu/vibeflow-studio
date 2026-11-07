@@ -25,6 +25,7 @@ import {
   ShieldAlert,
   User,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
@@ -35,6 +36,7 @@ import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide"
 import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
 import { AuthDialog } from "@/components/auth/AuthDialog";
 import { AdminConsoleModal } from "@/components/admin/AdminConsoleModal";
+import { ChangePasswordModal } from "@/components/auth/ChangePasswordModal";
 import { VibeFlowLogo } from "@/components/brand/VibeFlowLogo";
 
 interface TopBarProps {
@@ -53,6 +55,7 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const [skillsMpStoreOpen, setSkillsMpStoreOpen] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [adminConsoleOpen, setAdminConsoleOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -389,6 +392,17 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
                 )}
 
                 <button
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    setChangePasswordOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-foreground hover:bg-secondary transition-colors text-left"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-primary shrink-0" />
+                  <span>Changer mon mot de passe</span>
+                </button>
+
+                <button
                   onClick={async () => {
                     setUserMenuOpen(false);
                     await logout();
@@ -417,6 +431,12 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
       <AuthDialog
         isOpen={authDialogOpen}
         onClose={() => setAuthDialogOpen(false)}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={changePasswordOpen}
+        onClose={() => setChangePasswordOpen(false)}
       />
 
       {/* Admin Console Modal */}
