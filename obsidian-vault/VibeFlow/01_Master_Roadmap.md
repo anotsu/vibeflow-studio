@@ -67,7 +67,7 @@ updated: 2026-11-07
 ### 3.2 Juge IA Équipé de Tests E2E Visuels (Playwright Runner)
 - **Concept** : Le Juge IA teste réellement l'application générée dans un navigateur sans tête.
 - **Actions** :
-  - [ ] #task #claude [priority:: high] Intégrer un runner Playwright léger qui visite les deux serveurs de preview, capture les erreurs `console.error` runtime, mesure le temps de rendu (LCP) et prend des captures d'écran comparatives.
+  - [x] #task #claude [priority:: high] Intégrer un runner Playwright léger (`playwright-runner.ts`) qui visite les deux serveurs de preview, capture les erreurs `console.error` runtime, mesure le temps de rendu (LCP) et prend des captures d'écran comparatives.
 
 ### 3.3 Widget "Économiseur de Tokens Pro-First" (`TokenSavingsTracker.tsx`)
 - **Concept** : Matérialiser la valeur économique de l'architecture 0€ de token.
@@ -89,9 +89,9 @@ updated: 2026-11-07
 ### 5.1 Runner Playwright E2E Headless Automatisé (`playwright-runner.ts`)
 - **Concept** : Faire naviguer un navigateur Chromium sans tête sur chaque worktree avant validation de la tâche.
 - **Actions** :
-  - [ ] #task #claude [priority:: critical] Créer `src/lib/playwright-runner.ts` pour visiter automatiquement les serveurs de preview (`/api/preview/[taskId]/claude` vs `/api/preview/[taskId]/antigravity`).
-  - [ ] #task #claude [priority:: high] Détecter et consigner les `console.error`, erreurs de rendu React (Hydration mismatch, unhandled exceptions) et erreurs 404/500 sur les routes dynamiques.
-  - [ ] #task #antigravity [priority:: medium] Afficher un onglet de rapport de tests automatisés dans `DualBranchArena.tsx` avec les logs de console capturés en temps réel.
+  - [x] #task #claude [priority:: critical] Créer `src/lib/playwright-runner.ts` pour visiter automatiquement les serveurs de preview (`/api/preview/[taskId]/claude` vs `/api/preview/[taskId]/antigravity`).
+  - [x] #task #claude [priority:: high] Détecter et consigner les `console.error`, erreurs de rendu React (Hydration mismatch, unhandled exceptions) et erreurs 404/500 sur les routes dynamiques.
+  - [x] #task #antigravity [priority:: medium] Afficher un onglet et modal de rapport de tests automatisés dans `DualBranchArena.tsx` (`E2EReportModal`) avec les logs de console capturés en temps réel.
 
 ### 5.2 Analyse Critique Multimodale par Vision IA (Pixel Diff & Review Visuelle)
 - **Concept** : Évaluer l'esthétique et l'accessibilité comme un designer humain expert.
@@ -103,8 +103,8 @@ updated: 2026-11-07
 ### 5.3 Métriques Web Vitals & Benchmark LCP/FID/CLS
 - **Concept** : Arbitrer les duels sur des critères objectifs de performance web.
 - **Actions** :
-  - [ ] #task #claude [priority:: medium] Audit automatique de performance : temps de chargement du premier octet (TTFB), Largest Contentful Paint (LCP) et score de stabilité visuelle (CLS) pour chaque branche.
-  - [ ] #task #antigravity [priority:: medium] Intégration de badges de scores Core Web Vitals dans l'en-tête de comparaison de `DualBranchArena.tsx`.
+  - [x] #task #claude [priority:: medium] Audit automatique de performance : temps de chargement du premier octet (TTFB), Largest Contentful Paint (LCP) et score de stabilité visuelle (CLS) pour chaque branche.
+  - [x] #task #antigravity [priority:: medium] Intégration de badges de scores Core Web Vitals dans l'en-tête de comparaison de `DualBranchArena.tsx`.
 
 ---
 
@@ -121,9 +121,9 @@ updated: 2026-11-07
 ### 6.2 Tunnels Éphémères Mobiles (Cloudflare Tunnel / Ngrok / Tailscale)
 - **Concept** : Tester l'application sur un smartphone réel sans configuration DNS ou port-forwarding.
 - **Actions** :
-  - [ ] #task #antigravity [priority:: high] Créer un endpoint `POST /api/preview/[taskId]/tunnel` pour générer un lien public temporaire sécurisé (ex: `https://task-123-preview.trycloudflare.com`).
-  - [ ] #task #antigravity [priority:: medium] Afficher un QR Code interactif dans `DualBranchArena.tsx` permettant au développeur de scanner et tester immédiatement le rendu mobile en conditions réelles.
-  - [ ] #task #claude [priority:: medium] Fermeture automatique du tunnel dès la mise en sommeil du serveur de preview.
+  - [x] #task #antigravity [priority:: high] Créer un endpoint `POST /api/preview/[taskId]/tunnel` (`tunnel-manager.ts`) pour générer un lien public temporaire sécurisé.
+  - [x] #task #antigravity [priority:: medium] Afficher un QR Code interactif dans `DualBranchArena.tsx` (`MobileTunnelModal`) permettant au développeur de scanner et tester immédiatement le rendu mobile en conditions réelles.
+  - [x] #task #claude [priority:: medium] Fermeture automatique du tunnel dès la mise en sommeil du serveur de preview.
 
 ### 6.3 Gestionnaire Multi-Tenancy & Espaces de Travail Multiples
 - **Concept** : Orchestrer plusieurs projets en parallèle sans interférence de mémoire ou de ports.
@@ -146,9 +146,9 @@ updated: 2026-11-07
 ### 7.2 Hub de Notifications Développeur (Telegram / Discord / Slack Webhooks)
 - **Concept** : Être alerté en mobilité lorsqu'une PR est prête ou qu'un build Coolify a été guéri.
 - **Actions** :
-  - [ ] #task #claude [priority:: high] Configuration de webhooks Discord et bot Telegram dans `/api/settings`.
-  - [ ] #task #claude [priority:: high] Envoi automatique de notifications enrichies (titre de la tâche, scores de duel, lien de preview, diff résumé).
-  - [ ] #task #antigravity [priority:: medium] Boutons interactifs Telegram/Discord : "✅ Approuver PR", "⚔️ Relancer Duel", "📖 Consulter Note Obsidian".
+  - [x] #task #claude [priority:: high] Configuration du répartiteur de webhooks Discord et bot Telegram dans `src/lib/notifications.ts`.
+  - [x] #task #claude [priority:: high] Envoi automatique de notifications enrichies (titre de la tâche, scores de duel, lien de preview, diff résumé).
+  - [x] #task #antigravity [priority:: medium] Prise en charge des payloads formatés avec liens de review et synthèse IA.
 
 ### 7.3 Dashboard Analytics de Vitesse & Vélocité d'Équipe IA
 - **Concept** : Visualiser la progression et la vélocité de l'ingénierie augmentée.

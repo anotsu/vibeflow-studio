@@ -37,12 +37,16 @@ import {
   GitPullRequest,
   Sliders,
   Dna,
+  Gauge,
+  QrCode,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import type { TaskWithRelations } from "@/types";
 import type { AgentDebateLog } from "@prisma/client";
 import type { TaskBenchmarkResult } from "@/lib/sandbox-runner";
+import type { DualE2ETestResult } from "@/lib/playwright-runner";
+import type { MobileTunnelInfo } from "@/lib/tunnel-manager";
 
 type ArenaView = "diff" | "debate" | "preview";
 
@@ -63,6 +67,16 @@ export function DualBranchArena() {
   const [isBenchmarking, setIsBenchmarking] = useState(false);
   const [benchmarkResult, setBenchmarkResult] = useState<TaskBenchmarkResult | null>(null);
   const [benchmarkModalOpen, setBenchmarkModalOpen] = useState(false);
+
+  // Playwright & Web Vitals E2E state
+  const [isE2ETesting, setIsE2ETesting] = useState(false);
+  const [e2eResult, setE2EResult] = useState<DualE2ETestResult | null>(null);
+  const [e2eModalOpen, setE2EModalOpen] = useState(false);
+
+  // Mobile tunnel state
+  const [isGeneratingTunnel, setIsGeneratingTunnel] = useState(false);
+  const [tunnelInfo, setTunnelInfo] = useState<MobileTunnelInfo | null>(null);
+  const [mobileTunnelModalOpen, setMobileTunnelModalOpen] = useState(false);
 
   // Filter tasks that have dual branches or candidate tasks
   const safeTasks = Array.isArray(tasks) ? tasks : [];
@@ -232,6 +246,65 @@ export function DualBranchArena() {
     }
   };
 
+  // Trigger Playwright Headless E2E & Web Vitals Audit
+  const handleRunE2ETest = async () => {
+    if (!selectedTask) return;
+    setIsE2ETesting(true);
+    try {
+      const res = await fetch(`/api/tasks/${selectedTask.id}/e2e-test`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Échec de l'audit E2E");
+      const data = await res.json();
+      setE2EResult(data.result);
+      setE2EModalOpen(true);
+      addNotification({
+        type: "success",
+        title: "Audit E2E Achevé !",
+        message: data.result.verdict.summary,
+        autoDismissMs: 4500,
+      });
+      if (selectedProject) {
+        await fetchTaskDebate(selectedTask.id);
+      }
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur E2E",
+        message: err.message,
+        autoDismissMs: 4000,
+      });
+    } finally {
+      setIsE2ETesting(false);
+    }
+  };
+
+  // Generate ephemeral mobile preview tunnel with QR code
+  const handleOpenMobileTunnel = async (role: "claude" | "antigravity" = "claude") => {
+    if (!selectedTask) return;
+    setIsGeneratingTunnel(true);
+    try {
+      const res = await fetch(`/api/preview/${selectedTask.id}/tunnel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) throw new Error("Échec de génération du tunnel mobile");
+      const data = await res.json();
+      setTunnelInfo(data.tunnel);
+      setMobileTunnelModalOpen(true);
+    } catch (err: any) {
+      addNotification({
+        type: "error",
+        title: "Erreur Tunnel Mobile",
+        message: err.message,
+        autoDismissMs: 4000,
+      });
+    } finally {
+      setIsGeneratingTunnel(false);
+    }
+  };
+
   // Trigger live simulation
   const handleRunSimulation = async () => {
     if (!selectedProject) return;
@@ -339,7 +412,22 @@ export function DualBranchArena() {
             ) : (
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             )}
-            <span>{isBenchmarking ? "Benchmark..." : "🧪 Benchmark Sandbox"}</span>
+            <span>{isBenchmarking ? "Benchmark..." : "🧪 Benchmark"}</span>
+          </button>
+
+          {/* Playwright Headless E2E & Web Vitals Audit */}
+          <button
+            onClick={handleRunE2ETest}
+            disabled={isE2ETesting || !selectedTask}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-md transition-all shadow-sm disabled:opacity-50"
+            title="Lancer l'audit automatisé E2E Headless & Core Web Vitals (LCP, CLS, TTFB, Hydration)"
+          >
+            {isE2ETesting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+            ) : (
+              <Gauge className="w-3.5 h-3.5 text-cyan-400" />
+            )}
+            <span>{isE2ETesting ? "Audit E2E..." : "⚡ Tests E2E"}</span>
           </button>
 
           {/* Hybrid Synthesis Button */}
@@ -429,6 +517,7 @@ export function DualBranchArena() {
               task={selectedTask}
               claudeUrl={claudeDeployment?.previewUrl}
               antigravityUrl={antigravityDeployment?.previewUrl}
+              onOpenMobileTunnel={handleOpenMobileTunnel}
             />
           )}
         </div>
@@ -439,6 +528,24 @@ export function DualBranchArena() {
         <BenchmarkReportModal
           benchmark={benchmarkResult}
           onClose={() => setBenchmarkModalOpen(false)}
+        />
+      )}
+
+      {/* Playwright Headless E2E & Web Vitals Modal */}
+      {e2eModalOpen && e2eResult && (
+        <E2EReportModal
+          result={e2eResult}
+          onClose={() => setE2EModalOpen(false)}
+          onHybridSynthesis={handleHybridSynthesis}
+        />
+      )}
+
+      {/* Ephemeral Mobile Tunnel & QR Code Modal */}
+      {mobileTunnelModalOpen && tunnelInfo && (
+        <MobileTunnelModal
+          tunnel={tunnelInfo}
+          onClose={() => setMobileTunnelModalOpen(false)}
+          onChangeRole={handleOpenMobileTunnel}
         />
       )}
     </div>
@@ -1431,6 +1538,319 @@ function BenchmarkReportModal({
   );
 }
 
+// ─── Playwright Headless E2E & Web Vitals Modal ─────────────
+
+function E2EReportModal({
+  result,
+  onClose,
+  onHybridSynthesis,
+}: {
+  result: DualE2ETestResult;
+  onClose: () => void;
+  onHybridSynthesis?: (taskId: string) => void;
+}) {
+  const isClaudeWinner = result.verdict.winner === "claude";
+  const isAntigravityWinner = result.verdict.winner === "antigravity";
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-card border border-border rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+        {/* Header */}
+        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between bg-card/80">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-lg">
+              <Gauge className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                Rapport d&apos;Audit E2E &amp; Core Web Vitals (Playwright Headless)
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                Mesure LCP/CLS/TTFB, intégrité d&apos;hydratation React 19 &amp; logs d&apos;erreurs runtime
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Verdict Banner */}
+        <div className="px-5 py-3 border-b border-border bg-gradient-to-r from-cyan-500/10 via-primary/10 to-blue-500/10 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-cyan-400" />
+            <span className="text-xs font-bold text-foreground">
+              Vainqueur Vitesse &amp; Stabilité :{" "}
+              <span className={isClaudeWinner ? "text-claude" : isAntigravityWinner ? "text-antigravity" : "text-emerald-400"}>
+                {isClaudeWinner ? "Claude Code Pro" : isAntigravityWinner ? "Antigravity CLI" : "Égalité Parfaite"}
+              </span>
+            </span>
+          </div>
+          <div className="text-[11px] text-muted-foreground font-mono">
+            Δ Vitesse : <span className="font-bold text-foreground">{result.verdict.performanceDeltaMs}ms</span>
+          </div>
+        </div>
+
+        {/* Content body with side by side web vitals */}
+        <div className="p-5 overflow-y-auto space-y-4 flex-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Claude Column */}
+            <div className="p-3.5 rounded-xl border border-claude/30 bg-claude/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-claude flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5" /> Claude Code Pro
+                </span>
+                <span className="text-sm font-mono font-bold text-claude">
+                  {result.claude.score}/100
+                </span>
+              </div>
+
+              {/* Web Vitals grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">LCP (Vitesse Affichage)</span>
+                  <span className={`font-mono font-bold text-xs ${result.claude.webVitals.lcpMs <= 1200 ? "text-emerald-400" : result.claude.webVitals.lcpMs <= 2500 ? "text-amber-400" : "text-red-400"}`}>
+                    {result.claude.webVitals.lcpMs} ms
+                  </span>
+                </div>
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">CLS (Stabilité Visuelle)</span>
+                  <span className="font-mono font-bold text-xs text-foreground">
+                    {result.claude.webVitals.clsScore}
+                  </span>
+                </div>
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">TTFB (Temps Serveur)</span>
+                  <span className="font-mono font-bold text-xs text-foreground">
+                    {result.claude.ttfbMs} ms
+                  </span>
+                </div>
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">Hydratation React</span>
+                  <span className={`font-mono font-bold text-xs ${result.claude.hydrationErrorsCount === 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {result.claude.hydrationErrorsCount === 0 ? "✓ 0 Erreur" : `${result.claude.hydrationErrorsCount} mismatch`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Logs */}
+              {result.claude.consoleLogs.length > 0 && (
+                <div className="text-[10px] bg-black/40 p-2 rounded-lg font-mono space-y-1 border border-border/40">
+                  <span className="text-muted-foreground block font-bold">Logs Console Détectés :</span>
+                  {result.claude.consoleLogs.map((log, i) => (
+                    <div key={i} className={log.type === "error" ? "text-red-400" : "text-amber-300"}>
+                      • {log.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Antigravity Column */}
+            <div className="p-3.5 rounded-xl border border-antigravity/30 bg-antigravity/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-antigravity flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5" /> Antigravity CLI
+                </span>
+                <span className="text-sm font-mono font-bold text-antigravity">
+                  {result.antigravity.score}/100
+                </span>
+              </div>
+
+              {/* Web Vitals grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">LCP (Vitesse Affichage)</span>
+                  <span className={`font-mono font-bold text-xs ${result.antigravity.webVitals.lcpMs <= 1200 ? "text-emerald-400" : result.antigravity.webVitals.lcpMs <= 2500 ? "text-amber-400" : "text-red-400"}`}>
+                    {result.antigravity.webVitals.lcpMs} ms
+                  </span>
+                </div>
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">CLS (Stabilité Visuelle)</span>
+                  <span className="font-mono font-bold text-xs text-foreground">
+                    {result.antigravity.webVitals.clsScore}
+                  </span>
+                </div>
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">TTFB (Temps Serveur)</span>
+                  <span className="font-mono font-bold text-xs text-foreground">
+                    {result.antigravity.ttfbMs} ms
+                  </span>
+                </div>
+                <div className="bg-background/60 p-2 rounded-lg border border-border/50">
+                  <span className="text-muted-foreground block text-[10px]">Hydratation React</span>
+                  <span className={`font-mono font-bold text-xs ${result.antigravity.hydrationErrorsCount === 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    {result.antigravity.hydrationErrorsCount === 0 ? "✓ 0 Erreur" : `${result.antigravity.hydrationErrorsCount} mismatch`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Logs */}
+              {result.antigravity.consoleLogs.length > 0 && (
+                <div className="text-[10px] bg-black/40 p-2 rounded-lg font-mono space-y-1 border border-border/40">
+                  <span className="text-muted-foreground block font-bold">Logs Console Détectés :</span>
+                  {result.antigravity.consoleLogs.map((log, i) => (
+                    <div key={i} className={log.type === "error" ? "text-red-400" : "text-amber-300"}>
+                      • {log.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Verdict and AI Recommendation */}
+          <div className="p-3 bg-card border border-border/80 rounded-xl space-y-1.5">
+            <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" /> Synthèse &amp; Recommandation du Juge IA
+            </h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {result.verdict.summary}
+            </p>
+            <p className="text-xs font-medium text-primary">
+              {result.verdict.recommendation}
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-border flex items-center justify-between bg-card/80">
+          {onHybridSynthesis && (
+            <button
+              onClick={() => {
+                onClose();
+                onHybridSynthesis(result.taskId);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-purple-500/20 to-primary/20 hover:from-purple-500/30 hover:to-primary/30 text-purple-200 border border-purple-500/30 rounded-md transition-all shadow-sm"
+            >
+              <Dna className="w-3.5 h-3.5 text-purple-400" />
+              <span>Lancer la Synthèse Hybride IA</span>
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-xs font-semibold bg-secondary hover:bg-secondary/80 text-foreground rounded-md transition-colors ml-auto"
+          >
+            Fermer l&apos;audit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Ephemeral Mobile Tunnel Modal ──────────────────────────
+
+function MobileTunnelModal({
+  tunnel,
+  onClose,
+  onChangeRole,
+}: {
+  tunnel: MobileTunnelInfo;
+  onClose: () => void;
+  onChangeRole: (role: "claude" | "antigravity") => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-card border border-border rounded-xl shadow-2xl max-w-md w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+        {/* Header */}
+        <div className="px-5 py-3.5 border-b border-border flex items-center justify-between bg-card/80">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-purple-500/10 text-purple-400 rounded-lg">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-foreground">
+                📱 Test Immédiat sur Smartphone
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                Tunnel chiffré live sans configuration réseau
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Role Switcher Tabs */}
+        <div className="p-2 bg-secondary/30 border-b border-border flex gap-1 justify-center">
+          <button
+            onClick={() => onChangeRole("claude")}
+            className={`px-3 py-1 text-xs rounded-md font-semibold transition-all ${
+              tunnel.role === "claude" ? "bg-claude text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Aperçu Claude Code
+          </button>
+          <button
+            onClick={() => onChangeRole("antigravity")}
+            className={`px-3 py-1 text-xs rounded-md font-semibold transition-all ${
+              tunnel.role === "antigravity" ? "bg-antigravity text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Aperçu Antigravity
+          </button>
+        </div>
+
+        {/* QR Code and link */}
+        <div className="p-6 flex flex-col items-center text-center space-y-4">
+          <div className="p-3 bg-white rounded-xl shadow-lg border border-border">
+            <img
+              src={tunnel.qrCodeUrl}
+              alt="QR Code Mobile Preview"
+              className="w-48 h-48 rounded-lg"
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Pointez l&apos;appareil photo de votre smartphone vers le QR code pour tester instantanément le rendu responsive en conditions réelles.
+          </p>
+
+          {/* Copy URL */}
+          <div className="w-full flex items-center gap-1.5 p-1.5 bg-background rounded-lg border border-border text-xs font-mono">
+            <input
+              type="text"
+              readOnly
+              value={tunnel.tunnelUrl}
+              className="flex-1 bg-transparent px-2 text-foreground truncate focus:outline-none"
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(tunnel.tunnelUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="p-1.5 rounded bg-secondary hover:bg-secondary/80 text-foreground transition-colors shrink-0"
+              title="Copier le lien"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-border flex items-center justify-end bg-card/80">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Generate Sandbox Preview HTML ──────────────────────────
 
 function generatePreviewHtml(
@@ -1697,10 +2117,12 @@ function PreviewView({
   task,
   claudeUrl,
   antigravityUrl,
+  onOpenMobileTunnel,
 }: {
   task: TaskWithRelations;
   claudeUrl?: string | null;
   antigravityUrl?: string | null;
+  onOpenMobileTunnel?: (role: "claude" | "antigravity") => void;
 }) {
   const [previewMode, setPreviewMode] = useState<"worktree" | "sandbox" | "coolify">("worktree");
   const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop");
@@ -1860,6 +2282,17 @@ function PreviewView({
             <RefreshCw className="w-3 h-3 text-primary" />
             <span>Hard Reload</span>
           </button>
+
+          {onOpenMobileTunnel && (
+            <button
+              onClick={() => onOpenMobileTunnel(activeBranchTab === "antigravity" ? "antigravity" : "claude")}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-purple-500/10 to-primary/10 hover:from-purple-500/20 hover:to-primary/20 text-purple-300 rounded text-[11px] font-semibold transition-colors border border-purple-500/30 shadow-sm"
+              title="Générer un QR code pour tester instantanément sur votre smartphone"
+            >
+              <Smartphone className="w-3 h-3 text-purple-400" />
+              <span>📱 QR Mobile</span>
+            </button>
+          )}
         </div>
       </div>
 
