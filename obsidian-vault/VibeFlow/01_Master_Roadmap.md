@@ -35,6 +35,7 @@ updated: 2026-11-07
 - **Actions** :
   - [x] #task #claude [priority:: critical] Unifier `$HOME=/home/nextjs`, sessions persistées dans le `Dockerfile` et permissions non-root `nextjs:nodejs`.
   - [x] #task #dual [priority:: high] Connecter `XtermTerminal.tsx` à un flux `node-pty` temps réel avec bascule automatique sur l'interpréteur de commandes sécurisé `/api/terminal/execute`.
+  - [x] #task #dual [priority:: high] Intégrer le moteur de détection d'état d'agent inspiré de Herdr (`src/lib/agent-state-detector.ts` via regex `claude.toml` & `antigravity.toml` + protocole OSC 7501) avec bannière de déblocage en 1 clic dans `XtermTerminal.tsx` et `DualBranchArena.tsx`.
 
 ---
 
