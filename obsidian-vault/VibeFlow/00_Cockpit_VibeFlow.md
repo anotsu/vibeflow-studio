@@ -25,6 +25,7 @@ updated: 2026-11-07
 - 🧭 **Cahiers des Charges & Cadrages** : Dossier [[06_Project_Blueprints/|06_Project_Blueprints (Charters de Projets)]]
 - 📐 **Spécifications OpenAPI & Mermaid** : Dossier [[07_API_Specs/|07_API_Specs (Architecture Continue)]]
 - 📦 **Briques Consensuelles Clé en Main** : Dossier [[08_Toolbox_Templates/|08_Toolbox_Templates (Templates de Modules)]]
+- ⚡ **Compétences Agent SkillsMP** : Dossier [[09_SkillsMP_Installed/|09_SkillsMP_Installed (Skills Marketplace skillsmp.com)]]
 
 ---
 
@@ -107,3 +108,4 @@ SORT created DESC
 | **Détecteur Multi-Stacks Polyglotte** | `src/lib/stack-detector.ts` | Détection & exécution dev auto (Next.js, Vite, Nuxt, FastAPI, Rust, Go) |
 | **Documentation Continue & OpenAPI** | `src/lib/api-docs-generator.ts` | Génération de specs OpenAPI 3.1 & diagrammes Mermaid ER / Architecture |
 | **Marketplace Skills & Personas** | `src/lib/agent-skills.ts` | Personas personnalisés et compétences métiers (OWASP, 60fps, WCAG) |
+| **Store SkillsMP & Recommandations** | `src/lib/skillsmp-client.ts` | Marketplace de compétences IA (skillsmp.com) & recommandations au cadrage |

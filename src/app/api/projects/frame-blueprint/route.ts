@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callAI } from "@/lib/ai-provider";
 import { pushToLiveObsidianApi, getVibeFlowVaultDir } from "@/lib/obsidian-sync";
+import { recommendSkillsForProject, installSkillMpToProject, SkillRecommendation } from "@/lib/skillsmp-client";
 import { slugify } from "@/lib/utils";
 import fs from "fs";
 import path from "path";
@@ -26,6 +27,7 @@ export interface ProjectFramingInput {
   hosting?: string;
   entities?: string;
   agentRules?: string;
+  selectedSkills?: string[];
 }
 
 export async function POST(request: NextRequest) {
@@ -50,6 +52,15 @@ export async function POST(request: NextRequest) {
     const agentRules =
       body.agentRules ||
       "Typage TypeScript strict (zéro any), modularité Server/Client Components, fluidité 60fps et architecture Zéro-Mock.";
+
+    // 0. Compute SkillsMP Recommendations
+    const recommendedSkills = recommendSkillsForProject(body);
+    const selectedIds = new Set(
+      body.selectedSkills && body.selectedSkills.length > 0
+        ? body.selectedSkills
+        : recommendedSkills.filter((r) => r.selectedByDefault).map((r) => r.skill.id)
+    );
+    const activeRecommended = recommendedSkills.filter((r) => selectedIds.has(r.skill.id));
 
     // 1. Synthesize Blueprint via AI
     const systemPrompt = `Tu es le Directeur Technique (Lead Software Architect) de VibeFlow Studio.
@@ -242,6 +253,27 @@ Entités clés modélisées : **${entities}**
       };
     }
 
+    // Append SkillsMP Recommendations to Project Charter
+    if (activeRecommended.length > 0) {
+      const skillsSection = `\n\n---\n\n## ⚡ Compétences SkillsMP Activées pour le Projet (skillsmp.com)\n\nCes compétences spécialisées de la marketplace SkillsMP orientent les arbitrages des agents Claude et Antigravity :\n\n${activeRecommended
+        .map(
+          (r) =>
+            `- **${r.skill.name}** (\`${r.skill.category}\`, ⭐ ${r.skill.stars}) : *${r.reason}*\n  > \`${r.skill.systemPromptInjection}\``
+        )
+        .join("\n\n")}\n`;
+
+      parsedBlueprint.projectCharterMarkdown += skillsSection;
+
+      // Auto-install and sync each skill to Obsidian (09_SkillsMP_Installed/)
+      for (const rec of activeRecommended) {
+        try {
+          await installSkillMpToProject(rec.skill.id, slug);
+        } catch (e) {
+          console.warn("[FrameBlueprint] Failed installing skill to Obsidian:", e);
+        }
+      }
+    }
+
     // 2. Sync Project Charter to Obsidian Vault in pure UTF-8
     const obsidianRelPath = `06_Project_Blueprints/${slug}_Charter.md`;
     await pushToLiveObsidianApi(obsidianRelPath, parsedBlueprint.projectCharterMarkdown);
@@ -266,6 +298,8 @@ Entités clés modélisées : **${entities}**
       slug,
       obsidianPath: `VibeFlow/${obsidianRelPath}`,
       blueprint: parsedBlueprint,
+      recommendedSkills,
+      activeSkills: activeRecommended,
     });
   } catch (error: any) {
     console.error("[POST /api/projects/frame-blueprint] Error:", error);

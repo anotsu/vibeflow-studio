@@ -5,6 +5,8 @@
 // customizable behavioral personas for Claude Code Pro and Antigravity CLI.
 // ============================================================
 
+import { getInstalledSkillsMpPrompts } from "@/lib/skillsmp-client";
+
 export interface AgentSkill {
   id: string;
   name: string;
@@ -194,6 +196,12 @@ export function buildSkillsAndPersonaPrompt(): string {
     for (const skill of skills) {
       lines.push(`${skill.systemPromptInjection}`);
     }
+  }
+
+  // Inject active SkillsMP marketplace skills
+  const skillsMpPrompt = getInstalledSkillsMpPrompts();
+  if (skillsMpPrompt) {
+    lines.push(skillsMpPrompt);
   }
 
   return lines.join("\n");

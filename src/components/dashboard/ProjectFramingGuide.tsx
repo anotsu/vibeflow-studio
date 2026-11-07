@@ -24,9 +24,13 @@ import {
   FileText,
   Check,
   GitBranch,
+  Star,
+  Store,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
+import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
+import type { SkillRecommendation, SkillsMpSkill } from "@/lib/skillsmp-client";
 
 interface ProjectFramingGuideProps {
   onClose: () => void;
@@ -61,6 +65,43 @@ export function ProjectFramingGuide({ onClose, onProjectCreated }: ProjectFramin
 
   // Generated Blueprint State
   const [blueprintResult, setBlueprintResult] = useState<any>(null);
+
+  // SkillsMP Recommendations State
+  const [recommendations, setRecommendations] = useState<SkillRecommendation[]>([]);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [showSkillsMpStore, setShowSkillsMpStore] = useState(false);
+
+  const fetchRecommendations = async () => {
+    setLoadingRecommendations(true);
+    try {
+      const res = await fetch("/api/skills/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRecommendations(data.recommendations || []);
+        if (selectedSkillIds.length === 0) {
+          const defaultSelected = (data.recommendations || [])
+            .filter((r: SkillRecommendation) => r.selectedByDefault)
+            .map((r: SkillRecommendation) => r.skill.id);
+          setSelectedSkillIds(defaultSelected);
+        }
+      }
+    } catch (err) {
+      console.warn("Failed fetching recommendations:", err);
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (step === 4) {
+      fetchRecommendations();
+    }
+  }, [step]);
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -123,7 +164,10 @@ export function ProjectFramingGuide({ onClose, onProjectCreated }: ProjectFramin
       const res = await fetch("/api/projects/frame-blueprint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          selectedSkills: selectedSkillIds,
+        }),
       });
 
       if (!res.ok) {
@@ -596,6 +640,95 @@ export function ProjectFramingGuide({ onClose, onProjectCreated }: ProjectFramin
                   </div>
                 </div>
               </div>
+
+              {/* SkillsMP Recommendations Section */}
+              <div className="space-y-3 pt-3 border-t border-border/70">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-bold text-foreground">
+                      Compétences Recommandées par SkillsMP (skillsmp.com)
+                    </span>
+                    <span className="text-[10px] font-mono bg-primary/20 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-bold">
+                      IA Matching
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSkillsMpStore(true)}
+                    className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                  >
+                    <Store className="w-3.5 h-3.5" />
+                    <span>Explorer le Store SkillsMP</span>
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Selon vos choix techniques ({formData.frontend}, {formData.database}, {formData.payment}), ces compétences spécialisées optimiseront le code produit :
+                </p>
+
+                {loadingRecommendations ? (
+                  <div className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    <span>Analyse des compétences adaptées...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recommendations.map((rec) => {
+                      const isSelected = selectedSkillIds.includes(rec.skill.id);
+                      return (
+                        <div
+                          key={rec.skill.id}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedSkillIds(selectedSkillIds.filter((id) => id !== rec.skill.id));
+                            } else {
+                              setSelectedSkillIds([...selectedSkillIds, rec.skill.id]);
+                            }
+                          }}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-3 ${
+                            isSelected
+                              ? "bg-primary/5 border-primary/40 shadow-sm"
+                              : "bg-secondary/20 border-border opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-foreground">
+                                {rec.skill.name}
+                              </span>
+                              <span className="text-[9px] uppercase font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded border border-border">
+                                {rec.skill.category}
+                              </span>
+                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full font-bold">
+                                {rec.score}% match
+                              </span>
+                              <span className="flex items-center gap-0.5 text-[10px] text-amber-400 font-bold">
+                                <Star className="w-2.5 h-2.5 fill-amber-400" />
+                                {rec.skill.stars}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-foreground/80 leading-relaxed">
+                              👉 <span className="font-medium text-primary">{rec.reason}</span>
+                            </p>
+                            <p className="text-[10px] text-muted-foreground line-clamp-1">
+                              {rec.skill.description}
+                            </p>
+                          </div>
+
+                          <div
+                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                              isSelected ? "bg-primary border-primary text-white" : "border-muted-foreground"
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -660,6 +793,29 @@ export function ProjectFramingGuide({ onClose, onProjectCreated }: ProjectFramin
                 </span>
                 <p className="whitespace-pre-wrap">{blueprintResult.blueprint?.summary}</p>
               </div>
+
+              {/* SkillsMP Active Skills Preview */}
+              {blueprintResult.activeSkills && blueprintResult.activeSkills.length > 0 && (
+                <div className="bg-primary/5 border border-primary/30 rounded-xl p-3.5 space-y-2">
+                  <span className="font-bold text-foreground block text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    Compétences SkillsMP Activées pour le Projet ({blueprintResult.activeSkills.length}) :
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {blueprintResult.activeSkills.map((s: any, idx: number) => (
+                      <div key={idx} className="p-2 rounded-lg bg-card border border-border text-[11px] space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-foreground">{s.skill.name}</span>
+                          <span className="text-[9px] uppercase font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            {s.skill.category}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">{s.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -725,6 +881,17 @@ export function ProjectFramingGuide({ onClose, onProjectCreated }: ProjectFramin
           </div>
         </div>
       </div>
+
+      {/* SkillsMP Marketplace Browser */}
+      <SkillsMpStoreModal
+        isOpen={showSkillsMpStore}
+        onClose={() => setShowSkillsMpStore(false)}
+        onSkillInstalled={(skill) => {
+          if (!selectedSkillIds.includes(skill.id)) {
+            setSelectedSkillIds([...selectedSkillIds, skill.id]);
+          }
+        }}
+      />
     </div>
   );
 }

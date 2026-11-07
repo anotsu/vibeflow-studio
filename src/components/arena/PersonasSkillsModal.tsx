@@ -20,6 +20,7 @@ import {
   Eye,
 } from "lucide-react";
 import type { AgentSkill, AgentPersona } from "@/lib/agent-skills";
+import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
 
 interface PersonasSkillsModalProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ export function PersonasSkillsModal({
   const [availablePersonas, setAvailablePersonas] = useState<AgentPersona[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [showSkillsMpStore, setShowSkillsMpStore] = useState(false);
 
   const fetchConfig = async () => {
     try {
@@ -245,9 +247,19 @@ export function PersonasSkillsModal({
 
               {/* Skills Selection */}
               <div>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  2. Compétences Métiers Pluggables (Skills)
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    2. Compétences Métiers Pluggables (Skills)
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowSkillsMpStore(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-primary/15 to-purple-500/15 hover:from-primary/25 hover:to-purple-500/25 text-primary border border-primary/30 rounded-lg transition-all shadow-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Store SkillsMP (skillsmp.com)</span>
+                  </button>
+                </div>
 
                 <div className="space-y-2.5">
                   {skills.map((skill) => (
@@ -310,6 +322,16 @@ export function PersonasSkillsModal({
           </button>
         </div>
       </div>
+
+      {/* SkillsMP Store Browser Modal */}
+      <SkillsMpStoreModal
+        isOpen={showSkillsMpStore}
+        onClose={() => setShowSkillsMpStore(false)}
+        onSkillInstalled={() => {
+          fetchConfig();
+          onUpdated?.();
+        }}
+      />
     </div>
   );
 }

@@ -19,12 +19,14 @@ import {
   Loader2,
   Sliders,
   Compass,
+  Store,
 } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useUIStore } from "@/stores/ui-store";
 import { TokenSavingsBadge } from "@/components/dashboard/TokenSavingsTracker";
 import { DaemonControllerModal } from "@/components/dashboard/DaemonControllerModal";
 import { ProjectFramingGuide } from "@/components/dashboard/ProjectFramingGuide";
+import { SkillsMpStoreModal } from "@/components/skills/SkillsMpStoreModal";
 
 interface TopBarProps {
   onOpenSettings?: () => void;
@@ -38,6 +40,7 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
   const [isTicking, setIsTicking] = useState(false);
   const [daemonModalOpen, setDaemonModalOpen] = useState(false);
   const [framingGuideOpen, setFramingGuideOpen] = useState(false);
+  const [skillsMpStoreOpen, setSkillsMpStoreOpen] = useState(false);
 
   const isAuto = selectedProject?.mode === "AUTO";
 
@@ -143,6 +146,16 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
         >
           <Compass className="w-3.5 h-3.5 text-purple-400" />
           <span className="hidden md:inline">Cadrer Projet</span>
+        </button>
+
+        {/* SkillsMP Store */}
+        <button
+          onClick={() => setSkillsMpStoreOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground border border-border text-xs font-semibold transition-all shadow-sm"
+          title="Ouvrir le Store de Compétences SkillsMP (skillsmp.com)"
+        >
+          <Store className="w-3.5 h-3.5 text-primary" />
+          <span className="hidden md:inline">SkillsMP Store</span>
         </button>
       </div>
 
@@ -304,6 +317,12 @@ export function TopBar({ onOpenSettings, onOpenCliSetup }: TopBarProps) {
       {framingGuideOpen && (
         <ProjectFramingGuide onClose={() => setFramingGuideOpen(false)} />
       )}
+
+      {/* SkillsMP Store Browser Modal */}
+      <SkillsMpStoreModal
+        isOpen={skillsMpStoreOpen}
+        onClose={() => setSkillsMpStoreOpen(false)}
+      />
     </header>
   );
 }
